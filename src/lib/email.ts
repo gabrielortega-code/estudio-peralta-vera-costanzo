@@ -1,7 +1,9 @@
 import { Resend } from "resend";
 import { CONTACT } from "./site";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 interface TurnoData {
   nombre: string;
@@ -13,7 +15,7 @@ interface TurnoData {
 }
 
 export async function sendConfirmacionCliente(turno: TurnoData) {
-  await resend.emails.send({
+  await getResend().emails.send({
     from: process.env.EMAIL_FROM!,
     to: turno.email,
     subject: "Solicitud de turno recibida - Estudio Peralta Vera Costanzo",
@@ -53,7 +55,7 @@ export async function sendConfirmacionCliente(turno: TurnoData) {
 }
 
 export async function sendNotificacionAdmin(turno: TurnoData & { telefono: string; mensaje?: string }) {
-  await resend.emails.send({
+  await getResend().emails.send({
     from: process.env.EMAIL_FROM!,
     to: process.env.EMAIL_ADMIN!,
     subject: `Nuevo turno: ${turno.nombre} - ${turno.fecha} ${turno.horaInicio}`,

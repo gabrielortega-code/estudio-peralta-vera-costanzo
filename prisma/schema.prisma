@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Turno {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Datos del cliente
+  nombre      String
+  email       String
+  telefono    String
+  dni         String?
+
+  // Datos del turno
+  servicio    String?
+  modalidad   String?  // "Presencial" | "Virtual"
+  canal       String?  // si es Virtual: "Zoom" | "Google Meet" | "WhatsApp (videollamada)"
+  fecha       DateTime
+  horaInicio  String   // ej: "10:00"
+  horaFin     String   // ej: "11:00"
+  mensaje     String?
+
+  // Estado del turno
+  estado      EstadoTurno @default(PENDIENTE)
+  notaAdmin   String?
+
+  @@map("turnos")
+}
+
+enum EstadoTurno {
+  PENDIENTE
+  CONFIRMADO
+  CANCELADO
+  COMPLETADO
+}
+
+model CalendarConfig {
+  id        String   @id @default("main")
+  config    Json
+  updatedAt DateTime @updatedAt
+
+  @@map("calendar_config")
+}

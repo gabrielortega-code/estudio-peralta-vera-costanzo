@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const stats = [
   { value: "+12", label: "años de trayectoria" },
@@ -21,10 +22,22 @@ export default function Hero() {
       {/* Gold accent line */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold-600 via-gold-400 to-gold-600" />
 
+      {/* Isologo watermark */}
+      <div className="absolute right-[-60px] md:right-[-20px] top-1/2 -translate-y-1/2 w-[360px] md:w-[520px] lg:w-[620px] opacity-[0.11] pointer-events-none select-none">
+        <Image
+          src="/branding/isologo-claro.png"
+          alt=""
+          width={620}
+          height={620}
+          className="w-full h-auto"
+          priority
+        />
+      </div>
+
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-32 md:py-28">
         <div className="max-w-3xl">
           <p className="text-gold-400 text-xs sm:text-sm font-semibold uppercase tracking-widest mb-5">
-            Estudio Jurídico · Derecho de Seguros y Daños
+            Peralta &amp; Vera Costanzo · Estudio Jurídico
           </p>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-white leading-[1.1] mb-5">
             Defendemos los{" "}

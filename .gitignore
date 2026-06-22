@@ -35,3 +35,9 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Archivos de referencia del cliente (no son parte del código)
+Branding/
+docs/
+Miembros Estudio Juridico Peralta Vera 2/
+SETUP.md

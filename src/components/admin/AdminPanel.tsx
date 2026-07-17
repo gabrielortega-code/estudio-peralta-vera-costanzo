@@ -8,7 +8,6 @@ import {
   type LinkSettings,
   ESTADO_META,
   HORARIOS,
-  buildMockTurnos,
   toDateKey,
   addDays,
   turnoDateKey,
@@ -63,7 +62,6 @@ const ESTADO_FILTERS: { value: "TODOS" | EstadoTurno; label: string }[] = [
 
 export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(false);
-  const [demo, setDemo] = useState(false);
   const [secret, setSecret] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -144,7 +142,6 @@ export default function AdminPanel() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setTurnos(data);
-      setDemo(false);
       setAuthenticated(true);
       loadCalendarConfig(secret);
     } catch {
@@ -154,29 +151,20 @@ export default function AdminPanel() {
     }
   }
 
-  function enterDemo() {
-    setTurnos(buildMockTurnos());
-    setDemo(true);
-    setAuthenticated(true);
-  }
-
-  /** Actualiza el turno en memoria y (en modo real) persiste en la API. */
+  /** Actualiza el turno en memoria y persiste en la API. */
   function mutate(id: string, patch: Partial<Turno>, msg?: string) {
     setTurnos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...patch } : t))
     );
     setSelected((sel) => (sel && sel.id === id ? { ...sel, ...patch } : sel));
-    if (!demo) {
-      // Conexión real: persistimos el cambio. (mailing/Supabase: fase siguiente)
-      fetch("/api/admin/turnos", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-secret": secret,
-        },
-        body: JSON.stringify({ id, ...patch }),
-      }).catch(() => {});
-    }
+    fetch("/api/admin/turnos", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secret": secret,
+      },
+      body: JSON.stringify({ id, ...patch }),
+    }).catch(() => {});
     if (msg) notify(msg);
   }
 
@@ -264,13 +252,6 @@ export default function AdminPanel() {
             >
               {loggingIn ? "Verificando…" : "Ingresar al panel"}
             </button>
-            <button
-              type="button"
-              onClick={enterDemo}
-              className="w-full text-navy-700 hover:text-navy-900 text-sm font-medium"
-            >
-              Explorar en modo demostración →
-            </button>
           </form>
         </div>
       </div>
@@ -302,11 +283,6 @@ export default function AdminPanel() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {demo && (
-              <span className="bg-gold-500/20 text-gold-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-gold-500/30">
-                Modo demo
-              </span>
-            )}
             <button
               onClick={() => setShowCalendar(true)}
               title="Configurar calendario"
@@ -333,7 +309,6 @@ export default function AdminPanel() {
                 setAuthenticated(false);
                 setTurnos([]);
                 setSecret("");
-                setDemo(false);
               }}
               className="text-gray-300 hover:text-white text-sm transition-colors"
             >

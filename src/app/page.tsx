@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
+import HeroFaqStrip from "@/components/HeroFaqStrip";
 import Services from "@/components/Services";
 import WhyUs from "@/components/WhyUs";
 import Team from "@/components/Team";
@@ -12,6 +13,7 @@ export default function Home() {
       <Header />
       <main>
         <Hero />
+        <HeroFaqStrip />
         <Services />
         <WhyUs />
         <Team />

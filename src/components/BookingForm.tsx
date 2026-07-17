@@ -388,8 +388,8 @@ export default function BookingForm() {
       )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800">
-        La primera consulta es <strong>sin cargo</strong>. Un especialista se
-        comunicará para confirmar la disponibilidad del horario.
+        Un especialista se comunicará para confirmar la disponibilidad del
+        horario.
       </div>
 
       <button

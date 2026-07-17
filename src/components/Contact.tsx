@@ -12,7 +12,7 @@ export default function Contact() {
             <h2 className="section-title mb-6">Contacto</h2>
             <p className="text-gray-600 leading-relaxed mb-10">
               ¿Tiene una consulta legal? Comuníquese con nosotros por el medio
-              que prefiera. La primera consulta es sin cargo y sin compromiso.
+              que prefiera. La primera consulta es sin compromiso.
             </p>
 
             <div className="space-y-6">

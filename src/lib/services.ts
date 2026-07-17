@@ -1,5 +1,7 @@
 export type Service = {
   slug: string;
+  /** true para las áreas que se muestran como tarjeta en home y /servicios */
+  featured?: boolean;
   /** Título corto para tarjeta de home y navegación */
   title: string;
   /** Título extendido para el encabezado de la página de detalle */
@@ -19,6 +21,7 @@ export type Service = {
 export const services: Service[] = [
   {
     slug: "derecho-de-seguros",
+    featured: true,
     title: "Derecho de Seguros",
     longTitle: "Derecho de Seguros",
     cardDescription:
@@ -67,6 +70,7 @@ export const services: Service[] = [
   },
   {
     slug: "accidentes-de-transito",
+    featured: true,
     title: "Accidentes de Tránsito",
     longTitle: "Accidentes de Tránsito",
     cardDescription:
@@ -168,4 +172,4 @@ export function getService(slug: string): Service | undefined {
 }
 
 export const servicesIntro =
-  "Acompañamos cada caso desde el análisis inicial de la póliza y del siniestro hasta la resolución extrajudicial o judicial del conflicto.";
+  "Acompañamos cada caso desde el análisis inicial de la póliza y/o del siniestro hasta la resolución extrajudicial o judicial del conflicto.";

@@ -18,7 +18,7 @@ export default function Footer() {
             />
             <p className="text-sm leading-relaxed max-w-xs">
               Estudio Jurídico especializado en Derecho de Seguros y Daños. En
-              defensa de los derechos del asegurado desde hace más de 12 años.
+              defensa de los derechos del asegurado desde hace más de 22 años.
             </p>
 
             <ul className="mt-6 space-y-2 text-sm">
@@ -61,10 +61,7 @@ export default function Footer() {
             <h4 className="text-white text-sm font-semibold mb-4">Áreas de práctica</h4>
             <ul className="space-y-2 text-sm">
               <li><a href="/#servicios" className="hover:text-gold-400 transition-colors">Derecho de Seguros</a></li>
-              <li><a href="/#servicios" className="hover:text-gold-400 transition-colors">Rechazos de cobertura</a></li>
               <li><a href="/#servicios" className="hover:text-gold-400 transition-colors">Accidentes de Tránsito</a></li>
-              <li><a href="/#servicios" className="hover:text-gold-400 transition-colors">Responsabilidad Civil y Daños</a></li>
-              <li><a href="/#servicios" className="hover:text-gold-400 transition-colors">Liquidación de siniestros</a></li>
             </ul>
           </div>
 

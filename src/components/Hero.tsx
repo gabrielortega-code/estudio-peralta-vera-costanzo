@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 const stats = [
-  { value: "+12", label: "años de trayectoria" },
+  { value: "+22", label: "años de trayectoria" },
   { value: "+40", label: "reclamos extrajudiciales por mes" },
   { value: "+10", label: "demandas judiciales por mes" },
   { value: "+20", label: "productores de seguros asesorados" },
@@ -40,13 +40,13 @@ export default function Hero() {
             Peralta &amp; Vera Costanzo · Estudio Jurídico
           </p>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-white leading-[1.1] mb-5">
-            Defendemos los{" "}
-            <span className="text-gold-400">derechos del asegurado</span>
+            Especialistas en seguros.{" "}
+            <span className="text-gold-400">En defensa del asegurado</span>
           </h1>
           <p className="text-gray-300 text-base md:text-lg leading-relaxed mb-10 max-w-xl">
-            Representamos a asegurados y damnificados en conflictos con las
-            compañías de seguros: rechazos de cobertura, accidentes de tránsito,
-            daños e indemnizaciones impagas.
+            Representamos a asegurados, en conflictos derivados de siniestros:
+            demoras, rechazos de cobertura, liquidaciones insuficientes e
+            indemnizaciones impagas.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4">

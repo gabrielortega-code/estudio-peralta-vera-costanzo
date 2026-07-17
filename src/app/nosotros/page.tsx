@@ -125,12 +125,6 @@ export default function NosotrosPage() {
                       </li>
                     ))}
                   </ul>
-
-                  {member.pending && (
-                    <p className="text-gray-400 text-xs italic mt-5">
-                      Ficha profesional ampliada próximamente.
-                    </p>
-                  )}
                 </div>
               </article>
             ))}

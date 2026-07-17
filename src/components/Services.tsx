@@ -2,6 +2,8 @@ import Link from "next/link";
 import { services, servicesIntro } from "@/lib/services";
 import { serviceIcons } from "@/lib/serviceIcons";
 
+const featuredServices = services.filter((service) => service.featured);
+
 export default function Services() {
   return (
     <section id="servicios" className="py-20 bg-gray-50">
@@ -12,8 +14,8 @@ export default function Services() {
           <p className="text-gray-600 mt-4 max-w-2xl mx-auto">{servicesIntro}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {services.map((service) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+          {featuredServices.map((service) => (
             <Link
               key={service.slug}
               href={`/servicios/${service.slug}`}
@@ -36,15 +38,6 @@ export default function Services() {
               </span>
             </Link>
           ))}
-        </div>
-
-        <div className="text-center mt-12">
-          <Link
-            href="/servicios"
-            className="inline-block border-2 border-navy-700 text-navy-700 hover:bg-navy-700 hover:text-white font-semibold text-sm px-8 py-3 rounded transition-colors"
-          >
-            Ver todas las áreas de práctica
-          </Link>
         </div>
       </div>
     </section>

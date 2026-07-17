@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Estudio Jurídico Peralta & Vera Costanzo",
     description:
-      "Especialistas en Derecho de Seguros y Daños. Defendemos los derechos del asegurado desde hace más de 12 años.",
+      "Especialistas en Derecho de Seguros y Daños. Defendemos los derechos del asegurado desde hace más de 22 años.",
     type: "website",
   },
   icons: {

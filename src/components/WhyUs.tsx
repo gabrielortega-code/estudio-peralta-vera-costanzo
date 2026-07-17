@@ -42,7 +42,7 @@ const reasons = [
   {
     title: "Gestión integral del reclamo",
     description:
-      "Intervenimos desde el análisis inicial de la póliza y del siniestro hasta la resolución extrajudicial o judicial del conflicto.",
+      "Intervenimos desde el análisis inicial de la póliza y/o del siniestro hasta la resolución extrajudicial o judicial del conflicto.",
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -72,7 +72,7 @@ export default function WhyUs() {
               Por qué elegirnos
             </p>
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-white mb-6">
-              En defensa de los derechos del asegurado desde hace más de 12 años
+              En defensa de los derechos del asegurado desde hace más de 22 años
             </h2>
             <p className="text-gray-400 leading-relaxed mb-8">
               Somos un Estudio Jurídico especializado en Derecho de Seguros y

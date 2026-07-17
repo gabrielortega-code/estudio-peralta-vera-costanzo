@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { id, estado, notaAdmin, fecha, horaInicio, horaFin } = body;
+  const { id, estado, notaAdmin, fecha, horaInicio, horaFin, enlace } = body;
 
   if (!id) {
     return NextResponse.json({ error: "Falta el id del turno" }, { status: 400 });
@@ -41,6 +41,7 @@ export async function PATCH(req: NextRequest) {
   if (fecha !== undefined) data.fecha = new Date(fecha);
   if (horaInicio !== undefined) data.horaInicio = horaInicio;
   if (horaFin !== undefined) data.horaFin = horaFin;
+  if (enlace !== undefined) data.enlace = enlace;
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });

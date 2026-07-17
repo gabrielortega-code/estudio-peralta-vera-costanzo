@@ -30,6 +30,7 @@ model Turno {
   // Estado del turno
   estado      EstadoTurno @default(PENDIENTE)
   notaAdmin   String?
+  enlace      String?  // link de la videollamada (turnos virtuales)
 
   @@map("turnos")
 }

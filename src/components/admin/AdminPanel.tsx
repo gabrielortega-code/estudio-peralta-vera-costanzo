@@ -828,6 +828,8 @@ function MonthView({
           const isPast = dk < todayKey;
           const dayNum = parseInt(dk.slice(8), 10);
 
+          const MAX_CHIPS = 3;
+
           return (
             <button
               key={dk}
@@ -840,7 +842,7 @@ function MonthView({
                   : undefined
               }
               className={[
-                "relative flex flex-col items-center gap-1 pt-1.5 pb-1 px-0.5 min-h-[3.25rem] sm:min-h-[4.25rem] rounded-lg border text-xs transition-colors",
+                "relative flex flex-col items-stretch gap-0.5 pt-1 pb-1 px-0.5 sm:px-1 min-h-[4.25rem] sm:min-h-[6.25rem] rounded-lg border text-left transition-colors overflow-hidden",
                 delDia.length > 0
                   ? "bg-white border-slate-200 hover:border-navy-400"
                   : "bg-slate-50/60 border-slate-100 hover:bg-slate-100",
@@ -849,27 +851,29 @@ function MonthView({
               ].join(" ")}
             >
               <span
-                className={
-                  delDia.length > 0
+                className={[
+                  "self-center grid place-items-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[11px] sm:text-xs mb-0.5 flex-shrink-0",
+                  isToday
+                    ? "bg-navy-900 text-white font-bold"
+                    : delDia.length > 0
                     ? "font-semibold text-navy-900"
-                    : "text-slate-400"
-                }
+                    : "text-slate-400",
+                ].join(" ")}
               >
                 {dayNum}
               </span>
-              {delDia.length > 0 && (
-                <span className="flex flex-wrap justify-center gap-0.5 max-w-full px-0.5">
-                  {delDia.slice(0, 6).map((t) => (
-                    <span
-                      key={t.id}
-                      className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${ESTADO_META[t.estado].dot}`}
-                    />
-                  ))}
-                  {delDia.length > 6 && (
-                    <span className="text-[9px] text-slate-500 leading-none">
-                      +{delDia.length - 6}
-                    </span>
-                  )}
+              {delDia.slice(0, MAX_CHIPS).map((t) => (
+                <span
+                  key={t.id}
+                  className={`block truncate rounded px-1 py-0.5 text-[9px] sm:text-[10px] leading-tight font-medium ${ESTADO_META[t.estado].pill}`}
+                >
+                  <span className="hidden sm:inline">{t.horaInicio} </span>
+                  {t.nombre}
+                </span>
+              ))}
+              {delDia.length > MAX_CHIPS && (
+                <span className="text-[9px] sm:text-[10px] text-slate-500 px-1 leading-tight">
+                  +{delDia.length - MAX_CHIPS} más
                 </span>
               )}
             </button>
@@ -882,13 +886,12 @@ function MonthView({
         {(
           ["PENDIENTE", "CONFIRMADO", "COMPLETADO", "CANCELADO"] as EstadoTurno[]
         ).map((e) => (
-          <div
+          <span
             key={e}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
+            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${ESTADO_META[e].pill}`}
           >
-            <span className={`w-2 h-2 rounded-full ${ESTADO_META[e].dot}`} />
             {ESTADO_META[e].label}
-          </div>
+          </span>
         ))}
         <p className="text-xs text-slate-400 ml-auto">
           Tocá un día para ver su agenda

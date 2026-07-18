@@ -62,6 +62,7 @@ const ESTADO_FILTERS: { value: "TODOS" | EstadoTurno; label: string }[] = [
 
 export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [secret, setSecret] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -84,6 +85,19 @@ export default function AdminPanel() {
     setSettings(loadLinkSettings());
   }, []);
 
+  // Si hay una sesión activa (cookie), entra directo sin pedir la clave.
+  useEffect(() => {
+    fetch("/api/admin/turnos")
+      .then(async (res) => {
+        if (!res.ok) return;
+        setTurnos(await res.json());
+        setAuthenticated(true);
+        loadCalendarConfig();
+      })
+      .catch(() => {})
+      .finally(() => setCheckingSession(false));
+  }, []);
+
   const todayKey = toDateKey(new Date());
 
   function notify(msg: string) {
@@ -94,11 +108,9 @@ export default function AdminPanel() {
 
   /* ----------------------------- data load ----------------------------- */
 
-  async function loadCalendarConfig(adminSecret: string) {
+  async function loadCalendarConfig() {
     try {
-      const res = await fetch("/api/admin/calendario", {
-        headers: { "x-admin-secret": adminSecret },
-      });
+      const res = await fetch("/api/admin/calendario");
       if (res.ok) setCalendarConfig(await res.json());
     } catch {
       /* usa defaults */
@@ -110,10 +122,7 @@ export default function AdminPanel() {
     try {
       const res = await fetch("/api/admin/calendario", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-secret": secret,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
       });
       if (res.ok) {
@@ -136,14 +145,22 @@ export default function AdminPanel() {
     setLoggingIn(true);
     setLoginError("");
     try {
-      const res = await fetch("/api/admin/turnos", {
-        headers: { "x-admin-secret": secret },
+      const login = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret }),
       });
+      if (login.status === 429) {
+        setLoginError("Demasiados intentos. Esperá un minuto y volvé a probar.");
+        return;
+      }
+      if (!login.ok) throw new Error();
+      const res = await fetch("/api/admin/turnos");
       if (!res.ok) throw new Error();
-      const data = await res.json();
-      setTurnos(data);
+      setTurnos(await res.json());
+      setSecret("");
       setAuthenticated(true);
-      loadCalendarConfig(secret);
+      loadCalendarConfig();
     } catch {
       setLoginError("Clave incorrecta o sin conexión a la base de datos.");
     } finally {
@@ -159,10 +176,7 @@ export default function AdminPanel() {
     setSelected((sel) => (sel && sel.id === id ? { ...sel, ...patch } : sel));
     fetch("/api/admin/turnos", {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secret": secret,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...patch }),
     }).catch(() => {});
     if (msg) notify(msg);
@@ -206,6 +220,14 @@ export default function AdminPanel() {
   }, [delDia, turnos, todayKey]);
 
   /* ------------------------------- login ------------------------------- */
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-navy-950 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Verificando sesión…</p>
+      </div>
+    );
+  }
 
   if (!authenticated) {
     return (
@@ -306,6 +328,7 @@ export default function AdminPanel() {
             </button>
             <button
               onClick={() => {
+                fetch("/api/admin/login", { method: "DELETE" }).catch(() => {});
                 setAuthenticated(false);
                 setTurnos([]);
                 setSecret("");

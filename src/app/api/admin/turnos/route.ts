@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-function checkAuth(req: NextRequest) {
-  const secret = req.headers.get("x-admin-secret");
-  return secret === process.env.ADMIN_SECRET;
-}
+import { checkAdminAuth } from "@/lib/adminAuth";
 
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) {
+  if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -23,7 +19,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!checkAuth(req)) {
+  if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

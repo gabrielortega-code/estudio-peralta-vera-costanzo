@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_CALENDAR, type CalendarConfigData } from "@/lib/calendar";
-
-function checkAuth(req: NextRequest) {
-  return req.headers.get("x-admin-secret") === process.env.ADMIN_SECRET;
-}
+import { checkAdminAuth } from "@/lib/adminAuth";
 
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) {
+  if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   try {
@@ -21,7 +18,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!checkAuth(req)) {
+  if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   const config: CalendarConfigData = await req.json();

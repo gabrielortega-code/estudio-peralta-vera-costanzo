@@ -73,3 +73,20 @@ export const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+/**
+ * Celdas para renderizar un mes en grilla de 7 columnas (semana inicia lunes).
+ * Cada celda es un dateKey "YYYY-MM-DD" o null (relleno fuera del mes).
+ */
+export function monthCells(year: number, month: number): (string | null)[] {
+  const rawFirstDay = new Date(year, month, 1).getDay(); // 0=Dom
+  const offset = (rawFirstDay + 6) % 7; // Lun=0 … Dom=6
+  const total = new Date(year, month + 1, 0).getDate();
+  const mm = String(month + 1).padStart(2, "0");
+  const cells: (string | null)[] = Array(offset).fill(null);
+  for (let d = 1; d <= total; d++) {
+    cells.push(`${year}-${mm}-${String(d).padStart(2, "0")}`);
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}

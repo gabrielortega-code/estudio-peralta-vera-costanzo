@@ -12,6 +12,7 @@ import {
   WEEKDAY_ABBR,
   CALENDAR_HEADER,
   MONTH_NAMES,
+  monthCells,
 } from "@/lib/calendar";
 import { toDateKey } from "@/lib/turnos";
 
@@ -28,20 +29,6 @@ const TOK: Record<
 };
 
 /* ─── calendar helpers ──────────────────────────────────────── */
-
-/** Devuelve celdas para el mes. El primer día del calendario es Lunes. */
-function monthCells(year: number, month: number): (string | null)[] {
-  const rawFirstDay = new Date(year, month, 1).getDay(); // 0=Dom
-  const offset = (rawFirstDay + 6) % 7; // Lun=0 … Dom=6
-  const total = new Date(year, month + 1, 0).getDate();
-  const mm = String(month + 1).padStart(2, "0");
-  const cells: (string | null)[] = Array(offset).fill(null);
-  for (let d = 1; d <= total; d++) {
-    cells.push(`${year}-${mm}-${String(d).padStart(2, "0")}`);
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
-}
 
 function weekdayOf(dk: string): string {
   const [y, m, d] = dk.split("-").map(Number);

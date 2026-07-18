@@ -24,7 +24,13 @@ import {
   saveLinkSettings,
   defaultLinkFor,
 } from "@/lib/turnos";
-import { type CalendarConfigData, DEFAULT_CALENDAR } from "@/lib/calendar";
+import {
+  type CalendarConfigData,
+  DEFAULT_CALENDAR,
+  CALENDAR_HEADER,
+  MONTH_NAMES,
+  monthCells,
+} from "@/lib/calendar";
 import CalendarConfigPanel from "./CalendarConfigPanel";
 
 /* ------------------------------- helpers -------------------------------- */
@@ -68,6 +74,7 @@ export default function AdminPanel() {
   const [loginError, setLoginError] = useState("");
 
   const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [view, setView] = useState<"dia" | "mes">("dia");
   const [dateKey, setDateKey] = useState(toDateKey(new Date()));
   const [estadoFilter, setEstadoFilter] = useState<"TODOS" | EstadoTurno>(
     "TODOS"
@@ -445,6 +452,30 @@ export default function AdminPanel() {
           />
         </div>
 
+        {/* Selector de vista: día / mes */}
+        <div className="flex justify-end mb-4">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setView("dia")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                view === "dia" ? "bg-white text-navy-900 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              Día
+            </button>
+            <button
+              onClick={() => setView("mes")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                view === "mes" ? "bg-white text-navy-900 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              Mes
+            </button>
+          </div>
+        </div>
+
+        {view === "dia" ? (
+          <>
         {/* Date navigator */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5">
           <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
@@ -569,6 +600,18 @@ export default function AdminPanel() {
             ))}
           </div>
         )}
+          </>
+        ) : (
+          <MonthView
+            turnos={turnos}
+            todayKey={todayKey}
+            initialDateKey={dateKey}
+            onSelectDay={(dk) => {
+              setDateKey(dk);
+              setView("dia");
+            }}
+          />
+        )}
       </main>
 
       {/* Detail drawer */}
@@ -658,6 +701,199 @@ function StatCard({
       <p className={`text-2xl sm:text-3xl font-serif font-bold mt-1 ${accent}`}>
         {value}
       </p>
+    </div>
+  );
+}
+
+/** Vista mensual: pantallazo de todas las reservas del mes. */
+function MonthView({
+  turnos,
+  todayKey,
+  initialDateKey,
+  onSelectDay,
+}: {
+  turnos: Turno[];
+  todayKey: string;
+  initialDateKey: string;
+  onSelectDay: (dk: string) => void;
+}) {
+  const [viewYear, setViewYear] = useState(Number(initialDateKey.slice(0, 4)));
+  const [viewMonth, setViewMonth] = useState(
+    Number(initialDateKey.slice(5, 7)) - 1
+  );
+  const now = new Date();
+
+  const cells = useMemo(
+    () => monthCells(viewYear, viewMonth),
+    [viewYear, viewMonth]
+  );
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, Turno[]>();
+    for (const t of turnos) {
+      const dk = turnoDateKey(t);
+      const list = map.get(dk);
+      if (list) list.push(t);
+      else map.set(dk, [t]);
+    }
+    map.forEach((list) => {
+      list.sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+    });
+    return map;
+  }, [turnos]);
+
+  const monthPrefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+  const monthStats = useMemo(() => {
+    const delMes = turnos.filter((t) =>
+      turnoDateKey(t).startsWith(monthPrefix)
+    );
+    const count = (e: EstadoTurno) =>
+      delMes.filter((t) => t.estado === e).length;
+    return {
+      total: delMes.length,
+      pendientes: count("PENDIENTE"),
+      confirmados: count("CONFIRMADO"),
+    };
+  }, [turnos, monthPrefix]);
+
+  function prevMonth() {
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else setViewMonth((m) => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else setViewMonth((m) => m + 1);
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
+      {/* Navegación de mes */}
+      <div className="flex items-center gap-2 mb-1">
+        <button
+          onClick={prevMonth}
+          className="w-9 h-9 grid place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex-shrink-0"
+          aria-label="Mes anterior"
+        >
+          <Chevron dir="left" />
+        </button>
+        <p className="flex-1 text-center font-serif font-bold text-navy-900 text-base sm:text-lg">
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </p>
+        <button
+          onClick={nextMonth}
+          className="w-9 h-9 grid place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex-shrink-0"
+          aria-label="Mes siguiente"
+        >
+          <Chevron dir="right" />
+        </button>
+        {(viewYear !== now.getFullYear() || viewMonth !== now.getMonth()) && (
+          <button
+            onClick={() => {
+              setViewYear(now.getFullYear());
+              setViewMonth(now.getMonth());
+            }}
+            className="text-xs text-navy-700 hover:text-navy-900 font-medium border border-slate-200 px-2.5 h-9 rounded-lg flex-shrink-0"
+          >
+            Hoy
+          </button>
+        )}
+      </div>
+
+      {/* Resumen del mes */}
+      <p className="text-center text-xs text-slate-500 mb-4">
+        {monthStats.total === 0
+          ? "Sin turnos este mes"
+          : `${monthStats.total} ${monthStats.total === 1 ? "turno" : "turnos"} · ${monthStats.pendientes} pendientes · ${monthStats.confirmados} confirmados`}
+      </p>
+
+      {/* Grilla */}
+      <div className="grid grid-cols-7 gap-1">
+        {CALENDAR_HEADER.map((d) => (
+          <div
+            key={d}
+            className="text-center text-[10px] sm:text-xs font-semibold text-slate-400 py-1 uppercase tracking-wide"
+          >
+            {d}
+          </div>
+        ))}
+
+        {cells.map((dk, i) => {
+          if (!dk) return <div key={`pad-${i}`} />;
+          const delDia = byDay.get(dk) ?? [];
+          const isToday = dk === todayKey;
+          const isPast = dk < todayKey;
+          const dayNum = parseInt(dk.slice(8), 10);
+
+          return (
+            <button
+              key={dk}
+              onClick={() => onSelectDay(dk)}
+              title={
+                delDia.length > 0
+                  ? delDia
+                      .map((t) => `${t.horaInicio} ${t.nombre}`)
+                      .join("\n")
+                  : undefined
+              }
+              className={[
+                "relative flex flex-col items-center gap-1 pt-1.5 pb-1 px-0.5 min-h-[3.25rem] sm:min-h-[4.25rem] rounded-lg border text-xs transition-colors",
+                delDia.length > 0
+                  ? "bg-white border-slate-200 hover:border-navy-400"
+                  : "bg-slate-50/60 border-slate-100 hover:bg-slate-100",
+                isToday ? "ring-2 ring-navy-400" : "",
+                isPast && delDia.length === 0 ? "opacity-50" : "",
+              ].join(" ")}
+            >
+              <span
+                className={
+                  delDia.length > 0
+                    ? "font-semibold text-navy-900"
+                    : "text-slate-400"
+                }
+              >
+                {dayNum}
+              </span>
+              {delDia.length > 0 && (
+                <span className="flex flex-wrap justify-center gap-0.5 max-w-full px-0.5">
+                  {delDia.slice(0, 6).map((t) => (
+                    <span
+                      key={t.id}
+                      className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${ESTADO_META[t.estado].dot}`}
+                    />
+                  ))}
+                  {delDia.length > 6 && (
+                    <span className="text-[9px] text-slate-500 leading-none">
+                      +{delDia.length - 6}
+                    </span>
+                  )}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Leyenda */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-slate-100">
+        {(
+          ["PENDIENTE", "CONFIRMADO", "COMPLETADO", "CANCELADO"] as EstadoTurno[]
+        ).map((e) => (
+          <div
+            key={e}
+            className="flex items-center gap-1.5 text-xs text-slate-600"
+          >
+            <span className={`w-2 h-2 rounded-full ${ESTADO_META[e].dot}`} />
+            {ESTADO_META[e].label}
+          </div>
+        ))}
+        <p className="text-xs text-slate-400 ml-auto">
+          Tocá un día para ver su agenda
+        </p>
+      </div>
     </div>
   );
 }

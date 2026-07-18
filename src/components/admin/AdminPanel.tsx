@@ -98,6 +98,29 @@ export default function AdminPanel() {
       .finally(() => setCheckingSession(false));
   }, []);
 
+  // Refresco automático: nuevas reservas aparecen sin recargar la página
+  // (cada 60 s y al volver a la pestaña).
+  useEffect(() => {
+    if (!authenticated) return;
+    async function refresh() {
+      try {
+        const res = await fetch("/api/admin/turnos");
+        if (res.ok) setTurnos(await res.json());
+      } catch {
+        /* reintenta en el próximo ciclo */
+      }
+    }
+    const interval = window.setInterval(refresh, 60_000);
+    const onFocus = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [authenticated]);
+
   const todayKey = toDateKey(new Date());
 
   function notify(msg: string) {
@@ -203,6 +226,21 @@ export default function AdminPanel() {
       )
       .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
   }, [delDia, estadoFilter, search]);
+
+  /** Todos los turnos pendientes desde hoy en adelante, sin importar el día seleccionado. */
+  const pendientesGlobal = useMemo(
+    () =>
+      turnos
+        .filter(
+          (t) => t.estado === "PENDIENTE" && turnoDateKey(t) >= todayKey
+        )
+        .sort((a, b) =>
+          `${turnoDateKey(a)} ${a.horaInicio}`.localeCompare(
+            `${turnoDateKey(b)} ${b.horaInicio}`
+          )
+        ),
+    [turnos, todayKey]
+  );
 
   const stats = useMemo(() => {
     const count = (e: EstadoTurno) =>
@@ -342,6 +380,47 @@ export default function AdminPanel() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Reservas pendientes de confirmación (todas las fechas) */}
+        {pendientesGlobal.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <p className="font-semibold text-amber-900 text-sm">
+                {pendientesGlobal.length === 1
+                  ? "1 reserva pendiente de confirmación"
+                  : `${pendientesGlobal.length} reservas pendientes de confirmación`}
+              </p>
+            </div>
+            <div className="space-y-2">
+              {pendientesGlobal.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    setDateKey(turnoDateKey(t));
+                    setSelected(t);
+                  }}
+                  className="w-full flex items-center justify-between gap-3 bg-white border border-amber-100 hover:border-amber-300 rounded-lg px-3 py-2.5 text-left transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-navy-900 text-sm truncate">
+                      {t.nombre}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {formatShortDate(turnoDateKey(t))} · {t.horaInicio} hs
+                      {t.modalidad
+                        ? ` · ${t.modalidad}${t.canal ? ` (${t.canal})` : ""}`
+                        : ""}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold text-amber-700 whitespace-nowrap">
+                    Revisar →
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <StatCard

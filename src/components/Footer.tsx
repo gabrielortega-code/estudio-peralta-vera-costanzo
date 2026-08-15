@@ -18,7 +18,7 @@ export default function Footer() {
             />
             <p className="text-sm leading-relaxed max-w-xs">
               Estudio Jurídico especializado en Derecho de Seguros y Daños. En
-              defensa de los derechos del asegurado desde hace más de 22 años.
+              defensa de los derechos del asegurado desde hace más de 14 años.
             </p>
 
             <ul className="mt-6 space-y-2 text-sm">

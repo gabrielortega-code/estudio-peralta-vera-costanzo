@@ -138,8 +138,7 @@ export default function NosotrosPage() {
               ¿Tuvo un conflicto con su compañía de seguros?
             </h2>
             <p className="text-gray-600 mb-8">
-              Analizamos su caso y definimos juntos la mejor estrategia. La
-              primera consulta es sin compromiso.
+              Analizamos su caso y definimos juntos la mejor estrategia.
             </p>
             <Link
               href="/turnos"

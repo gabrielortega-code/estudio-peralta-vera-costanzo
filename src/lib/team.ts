@@ -36,8 +36,8 @@ export const team: Member[] = [
       "Miembro Titular de la Asociación Argentina de Derecho de Seguros.",
       "Abogado egresado de la Universidad Nacional de Córdoba.",
       "Maestrando en Derecho y Argumentación (UNC).",
-      "Diplomatura en Derecho de Seguros — Universidad de Buenos Aires.",
-      "Diplomatura en Derecho de Seguros — Club de Derecho (UNC).",
+      "Diplomatura en Derecho de Seguros — Universidad Católica de Buenos Aires.",
+      "Diplomatura en Derecho de Seguros — Club de Derecho.",
     ],
   },
   {

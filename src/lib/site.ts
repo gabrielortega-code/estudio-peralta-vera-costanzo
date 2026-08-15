@@ -9,7 +9,7 @@ export const CONTACT = {
   phoneTel: "+5493512004769",
   /** Número en formato wa.me (sólo dígitos, sin +). */
   whatsappNumber: "5493512004769",
-  email: "estudio@peraltaveracostanzo.com.ar",
+  email: "javier@estudiojuridicoperalta.com",
   address: {
     line1: "Deán Funes 154, 1° piso, oficina 13",
     line2: "Córdoba, Argentina",

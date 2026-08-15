@@ -1,12 +1,19 @@
 import Link from "next/link";
 import Image from "next/image";
 
+/**
+ * Variante B del Hero: la foto del equipo va de fondo, anclada al borde inferior
+ * derecho y atenuada con un degradé para que no compita con el texto.
+ * Convive con `Hero.tsx` (variante A, foto al costado) hasta que el cliente elija
+ * una; la que no se use se elimina junto con la ruta /preview/hero-fondo.
+ */
+
 const stats = [
   { value: "+14", label: "años de trayectoria" },
   { value: "+50", label: "productores de seguros asesorados" },
 ];
 
-export default function Hero() {
+export default function HeroBackdrop() {
   return (
     <section className="relative min-h-screen flex items-center bg-navy-950 overflow-hidden">
       {/* Background pattern */}
@@ -17,34 +24,27 @@ export default function Hero() {
         }}
       />
 
+      {/* Foto del equipo de fondo */}
+      <div className="absolute inset-y-0 right-0 w-full lg:w-[72%] opacity-25 lg:opacity-100 pointer-events-none select-none">
+        <Image
+          src="/equipo/equipo-completo.png"
+          alt=""
+          fill
+          priority
+          sizes="(max-width: 1024px) 100vw, 72vw"
+          className="object-contain object-bottom lg:object-right-bottom"
+        />
+        {/* Velo lateral: funde la foto contra el navy por la izquierda */}
+        <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/85 to-navy-950/20 lg:to-transparent" />
+        {/* Velo superior: evita el corte duro del recorte contra el borde */}
+        <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-navy-950 to-transparent" />
+      </div>
+
       {/* Gold accent line */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold-600 via-gold-400 to-gold-600" />
 
-      {/* Isologo watermark — sólo hasta lg, donde la foto del equipo ocupa ese lugar */}
-      <div className="lg:hidden absolute right-[-60px] md:right-[-20px] top-1/2 -translate-y-1/2 w-[360px] md:w-[520px] opacity-[0.11] pointer-events-none select-none">
-        <Image
-          src="/branding/isologo-claro.png"
-          alt=""
-          width={620}
-          height={620}
-          className="w-full h-auto"
-        />
-      </div>
-
-      {/* Foto del equipo al costado (lg+): anclada al piso de la sección */}
-      <div className="hidden lg:block absolute right-0 bottom-0 top-[14%] w-[46%] xl:w-[48%] pointer-events-none select-none">
-        <Image
-          src="/equipo/equipo-completo.png"
-          alt="Equipo del Estudio Jurídico Peralta & Vera Costanzo"
-          fill
-          priority
-          sizes="48vw"
-          className="object-contain object-bottom"
-        />
-      </div>
-
       <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-32 md:py-28">
-        <div className="lg:w-[54%]">
+        <div className="max-w-2xl">
           <p className="text-gold-400 text-xs sm:text-sm font-semibold uppercase tracking-widest mb-5">
             Peralta &amp; Vera Costanzo · Estudio Jurídico
           </p>
@@ -54,7 +54,7 @@ export default function Hero() {
               En defensa del asegurado
             </span>
           </h1>
-          <p className="text-gray-300 text-base md:text-lg leading-relaxed mb-10">
+          <p className="text-gray-300 text-base md:text-lg leading-relaxed mb-10 max-w-xl">
             Asesoramos, defendemos y representamos a los asegurados frente a todo
             tipo de incumplimiento contractual por parte de las aseguradoras.
           </p>
@@ -74,20 +74,8 @@ export default function Hero() {
             </a>
           </div>
 
-          {/* Foto del equipo en mobile/tablet: debajo del CTA, arriba de las métricas */}
-          <div className="lg:hidden mt-12">
-            <Image
-              src="/equipo/equipo-completo.png"
-              alt="Equipo del Estudio Jurídico Peralta & Vera Costanzo"
-              width={1600}
-              height={900}
-              sizes="(max-width: 640px) 100vw, 448px"
-              className="w-full h-auto max-w-sm sm:max-w-md mx-auto"
-            />
-          </div>
-
           {/* Stats */}
-          <dl className="mt-12 lg:mt-16 grid grid-cols-2 gap-x-8 gap-y-8 border-t border-white/10 pt-10">
+          <dl className="mt-16 grid grid-cols-2 gap-x-8 gap-y-8 border-t border-white/10 pt-10">
             {stats.map((stat) => (
               <div key={stat.label}>
                 <dt className="text-gold-400 font-serif text-3xl md:text-4xl font-bold">

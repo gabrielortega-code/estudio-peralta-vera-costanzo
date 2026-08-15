@@ -72,23 +72,14 @@ export default function WhyUs() {
               Por qué elegirnos
             </p>
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-white mb-6">
-              En defensa de los derechos del asegurado desde hace más de 22 años
+              En defensa de los derechos del asegurado desde hace más de 14 años
             </h2>
-            <p className="text-gray-400 leading-relaxed mb-8">
+            <p className="text-gray-400 leading-relaxed">
               Somos un Estudio Jurídico especializado en Derecho de Seguros y
               Daños. Representamos a asegurados, damnificados y terceros en
               conflictos con compañías aseguradoras, combinando especialización,
               estrategia y un acompañamiento cercano en cada etapa del reclamo.
             </p>
-            <div className="border-l-4 border-gold-500 pl-6">
-              <p className="text-white font-serif italic text-lg">
-                "Cada caso es único. Cada cliente merece una solución a medida,
-                no una respuesta genérica."
-              </p>
-              <p className="text-gold-400 text-sm mt-3">
-                — Estudio Jurídico Peralta &amp; Vera Costanzo
-              </p>
-            </div>
           </div>
 
           {/* Right column - reasons */}

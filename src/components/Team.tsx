@@ -14,23 +14,6 @@ export default function Team() {
           </p>
         </div>
 
-        {/* Team photo */}
-        <div className="relative mb-14 rounded-2xl bg-navy-950 overflow-hidden border border-navy-800">
-          <div
-            className="absolute inset-0 opacity-[0.07]"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c9a84c'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-            }}
-          />
-          <Image
-            src="/equipo/equipo-completo.png"
-            alt="Equipo del Estudio Jurídico Peralta & Vera Costanzo"
-            width={1600}
-            height={900}
-            className="relative w-full h-auto max-w-3xl mx-auto"
-          />
-        </div>
-
         {/* Member cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           {team.map((member) => (

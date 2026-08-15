@@ -2,10 +2,12 @@ import Link from "next/link";
 import Image from "next/image";
 
 /**
- * Variante B del Hero: la foto del equipo va de fondo, anclada al borde inferior
- * derecho y atenuada con un degradé para que no compita con el texto.
- * Convive con `Hero.tsx` (variante A, foto al costado) hasta que el cliente elija
- * una; la que no se use se elimina junto con la ruta /preview/hero-fondo.
+ * Variante B del Hero: en desktop la foto del equipo va de fondo, a sangre sobre
+ * el borde derecho y atenuada sólo en el sector donde se cruza con el texto.
+ * En mobile el concepto de "fondo" no se lee, así que la foto baja como bloque
+ * entre los botones y las métricas, apoyada sobre una luz suave.
+ * Convive con `Hero.tsx` (variante A, foto en recuadro) hasta que el cliente
+ * elija una; la que no se use se elimina junto con /preview/hero-fondo.
  */
 
 const stats = [
@@ -24,20 +26,29 @@ export default function HeroBackdrop() {
         }}
       />
 
-      {/* Foto del equipo de fondo */}
-      <div className="absolute inset-y-0 right-0 w-full lg:w-[72%] opacity-25 lg:opacity-100 pointer-events-none select-none">
+      {/* Desktop — foto de fondo sobre el borde derecho */}
+      <div className="hidden lg:block absolute inset-y-0 right-0 w-[57%] pointer-events-none select-none">
+        {/* Luz de fondo: despega los trajes oscuros del navy de la sección */}
+        <div className="absolute right-[4%] bottom-0 w-[85%] h-[80%] rounded-[50%] bg-navy-700/45 blur-3xl" />
         <Image
           src="/equipo/equipo-completo.png"
           alt=""
           fill
           priority
-          sizes="(max-width: 1024px) 100vw, 72vw"
-          className="object-contain object-bottom lg:object-right-bottom"
+          sizes="57vw"
+          className="object-contain object-right-bottom brightness-110 contrast-[1.05]"
         />
-        {/* Velo lateral: funde la foto contra el navy por la izquierda */}
-        <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/85 to-navy-950/20 lg:to-transparent" />
+        {/* Velo lateral: sólo funde el borde izquierdo, donde la foto se cruza
+            con el texto. Se corta antes de llegar a las personas. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, #080f24 0%, rgba(8,15,36,0.92) 8%, rgba(8,15,36,0.55) 18%, rgba(8,15,36,0) 29%)",
+          }}
+        />
         {/* Velo superior: evita el corte duro del recorte contra el borde */}
-        <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-navy-950 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-navy-950 to-transparent" />
       </div>
 
       {/* Gold accent line */}
@@ -74,8 +85,22 @@ export default function HeroBackdrop() {
             </a>
           </div>
 
+          {/* Mobile/tablet — la foto baja como bloque, sobre una luz suave que
+              evita que los trajes oscuros se pierdan contra el navy */}
+          <div className="lg:hidden relative mt-12">
+            <div className="absolute inset-x-[6%] bottom-0 h-[85%] rounded-[50%] bg-navy-700/45 blur-3xl" />
+            <Image
+              src="/equipo/equipo-completo.png"
+              alt="Equipo del Estudio Jurídico Peralta & Vera Costanzo"
+              width={1600}
+              height={900}
+              sizes="(max-width: 640px) 100vw, 448px"
+              className="relative w-full h-auto max-w-sm sm:max-w-md mx-auto brightness-110 contrast-[1.05]"
+            />
+          </div>
+
           {/* Stats */}
-          <dl className="mt-16 grid grid-cols-2 gap-x-8 gap-y-8 border-t border-white/10 pt-10">
+          <dl className="mt-12 lg:mt-16 grid grid-cols-2 gap-x-8 gap-y-8 border-t border-white/10 pt-10">
             {stats.map((stat) => (
               <div key={stat.label}>
                 <dt className="text-gold-400 font-serif text-3xl md:text-4xl font-bold">

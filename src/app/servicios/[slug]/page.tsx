@@ -128,11 +128,10 @@ export default async function ServicioDetailPage({
         <section className="bg-gray-50 py-16">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="section-title mb-4">
-              ¿Su caso encaja con esta área?
+              ¿Su situación se encuadra en esta área?
             </h2>
             <p className="text-gray-600 mb-8">
-              Analizamos su situación y definimos juntos la mejor estrategia. La
-              primera consulta es sin compromiso.
+              Analizamos su situación y definimos juntos la mejor estrategia.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link

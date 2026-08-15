@@ -29,13 +29,14 @@ export const services: Service[] = [
     lead: "Defendemos a asegurados, damnificados y terceros en todo tipo de conflicto con compañías aseguradoras.",
     intro: [
       "El Derecho de Seguros es el eje de nuestro trabajo. Conocemos en profundidad el funcionamiento del mercado asegurador, sus procedimientos internos y las defensas que habitualmente oponen las compañías frente a un reclamo.",
-      "Esa experiencia nos permite anticipar la estrategia de la aseguradora y definir, para cada caso, la vía más conveniente: negociación, mediación, reclamo administrativo o acción judicial.",
+      "Esa experiencia nos permite anticiparnos a los planteos de la aseguradora, tanto en instancias extrajudiciales —negociación, reclamo, mediación— como en sede judicial.",
     ],
     situations: [
       "La compañía rechazó o demora el pago de su indemnización.",
+      "Le exigen documentación reiterada o injustificada para dilatar el trámite.",
+      "Rechazan la cobertura invocando falta de pago por débito automático no efectivizado.",
       "Recibió una liquidación por un monto menor al que corresponde.",
       "Tiene un conflicto por la interpretación o el alcance de su póliza.",
-      "Es un tercero damnificado y la aseguradora no responde.",
     ],
     howWeHelp: [
       "Analizamos la póliza, el siniestro y la documentación del caso.",
@@ -75,16 +76,21 @@ export const services: Service[] = [
     longTitle: "Accidentes de Tránsito",
     cardDescription:
       "Representación de víctimas de accidentes de tránsito en el reclamo de los daños sufridos, en sede administrativa, prejudicial y judicial.",
-    lead: "Representamos a víctimas de accidentes de tránsito en el reclamo integral de los daños sufridos.",
+    lead: "Representamos a víctimas de accidentes de tránsito en el reclamo integral de los daños ocasionados.",
     intro: [
-      "Un accidente de tránsito puede generar daños materiales, lesiones físicas, gastos médicos, lucro cesante y daño moral. Reclamamos cada uno de esos rubros con respaldo técnico y criterio jurídico, contra el responsable y su aseguradora.",
+      "Reclamamos cada uno de esos rubros con respaldo técnico y criterio jurídico, contra el responsable del hecho y, cuando corresponda, su compañía aseguradora.",
       "Acompañamos a la víctima desde el primer momento, organizando la prueba y la documentación necesaria para sostener un reclamo sólido.",
     ],
     situations: [
       "Sufrió lesiones o daños en un accidente de tránsito.",
-      "El responsable o su seguro no quieren hacerse cargo.",
-      "No sabe qué daños puede reclamar ni cómo cuantificarlos.",
-      "Un familiar resultó gravemente afectado en un siniestro vial.",
+      "El responsable o su aseguradora se niegan a reconocer su responsabilidad en el hecho.",
+      "Desconoce qué rubros indemnizatorios le corresponden o cómo cuantificarlos.",
+      "Es responsable de un accidente de tránsito, no cuenta con seguro vigente y le reclaman por los daños.",
+      "No cuenta con los datos del vehículo responsable ni de su aseguradora.",
+      "Le ofrecieron una indemnización que considera insuficiente.",
+      "El conductor responsable se dio a la fuga.",
+      "Es responsable de un accidente de tránsito y no cuenta con seguro vigente.",
+      "Le iniciaron una demanda judicial por un accidente de tránsito y no posee cobertura de seguro.",
     ],
     howWeHelp: [
       "Reunimos y organizamos la prueba del accidente y de los daños.",

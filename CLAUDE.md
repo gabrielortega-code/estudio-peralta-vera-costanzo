@@ -10,11 +10,13 @@ Stack: **Next.js + Tailwind CSS + Prisma**. La página principal (`page.tsx`) en
 
 ## Sobre el estudio
 
-- Más de **22 años** de trayectoria.
-- Presentan más de **40 reclamos extrajudiciales por mes**.
-- Inician más de **10 demandas judiciales por mes** en derecho de seguros.
-- Atienden a más de **20 productores de seguros**.
+- Más de **14 años** de trayectoria.
+- Atienden a más de **50 productores de seguros**.
 - Representan a **asegurados, damnificados y terceros** en conflictos con compañías aseguradoras.
+
+> Las cifras de "+40 reclamos extrajudiciales por mes" y "+10 demandas judiciales por mes" se
+> retiraron del sitio por pedido del cliente (reunión con Javier Peralta). El Hero muestra
+> únicamente las dos métricas de arriba.
 
 ---
 
@@ -22,16 +24,17 @@ Stack: **Next.js + Tailwind CSS + Prisma**. La página principal (`page.tsx`) en
 
 ### Hero (versión vigente)
 
-- **Título**: "Especialistas en seguros. En defensa del asegurado"
-- **Subtítulo (capa 1)**: "Representamos a asegurados, en conflictos derivados de siniestros: demoras, rechazos de cobertura, liquidaciones insuficientes e indemnizaciones impagas."
-- **Franja secundaria (capa 2, componente `HeroFaqStrip`)** — más chica, como complemento del Hero, no como bandera:
-  - ¿Tu compañía de seguros no responde? Defendemos al asegurado.
+- **Título**: "Especialistas en Derecho de Seguros. En defensa del asegurado" — la segunda oración va en dorado y **debe caer en una sola línea propia** (salto forzado).
+- **Subtítulo (capa 1)**: "Asesoramos, defendemos y representamos a los asegurados frente a todo tipo de incumplimiento contractual por parte de las aseguradoras."
+- **Imagen**: el Hero abre con la foto grupal (`/equipo/equipo-completo.png`, recorte con fondo transparente). Por eso esa misma foto ya **no** se repite en la sección "Nuestro equipo" de la home; sigue estando en `/nosotros`.
+- **Franja secundaria (capa 2, componente `HeroFaqStrip`)** — el primer bloque es destacado (tiene que verse y leerse), los otros dos quedan chicos como complemento:
+  - **¿Problemas con tu aseguradora?** Te asesoramos y representamos ante conflictos derivados de siniestros, análisis de póliza, incumplimiento de la aseguradora, demoras injustificadas, liquidaciones de pago insuficientes, rechazos de cobertura, toda controversia en el vínculo contractual entre asegurado y aseguradora.
   - ¿Sufriste un accidente de tránsito? Reclamamos tus daños.
   - ¿Te reclaman por un siniestro? Te defendemos.
 
 ### Descripción del estudio (versión completa para sección "Nosotros")
 
-Estudio Jurídico especializado en Derechos de Seguros y Daños, en defensa de los derechos del asegurado desde hace más de 22 años.
+Estudio Jurídico especializado en Derechos de Seguros y Daños, en defensa de los derechos del asegurado desde hace más de 14 años.
 
 ### Sección "¿Por qué elegirnos?" — Versión con íconos (WhyUs)
 
@@ -81,8 +84,8 @@ Antecedentes:
 - Miembro Titular de la Asociación Argentina de Derecho de Seguros.
 - Abogado egresado de la Universidad Nacional de Córdoba.
 - Maestrando en Derecho y Argumentación (UNC).
-- Diplomatura en Derecho de Seguros — Universidad de Buenos Aires.
-- Diplomatura en Derecho de Seguros — Club de Derecho (UNC).
+- Diplomatura en Derecho de Seguros — Universidad Católica de Buenos Aires.
+- Diplomatura en Derecho de Seguros — Club de Derecho.
 
 Áreas: Derecho de Seguros · Responsabilidad Civil · Daños y Perjuicios · Accidentes de Tránsito
 
@@ -144,4 +147,4 @@ Antecedentes:
 - El **turno digital** es el feature central del sitio — priorizar claridad y facilidad de uso en `/turnos`.
 - El tono del copy es **profesional pero accesible**: evitar lenguaje excesivamente técnico-legal en secciones dirigidas al cliente final.
 - El cliente aprobó tanto la versión larga como la versión con íconos de los diferenciales — elegir según el componente que corresponda.
-- **"Consulta sin cargo/gratis" — pendiente de definición**: el código de ética profesional no permite ofrecer la primera consulta como gratuita. Se retiró toda mención de "sin cargo"/"gratuita" del sitio (Contact, BookingForm, /turnos), dejando solo "sin compromiso" donde correspondía. El cliente evalúa un esquema alternativo (p. ej. mencionar productores con convenio, o aclarar la gratuidad recién al confirmar el turno) pero todavía no lo definió — no reintroducir lenguaje de gratuidad sin confirmación explícita del cliente.
+- **Nada de "sin cargo/gratis" NI de "sin compromiso"**: el código de ética profesional no permite ofrecer la primera consulta como gratuita, y en la reunión con Javier Peralta el cliente pidió eliminar además toda referencia a "primera consulta sin compromiso". Hoy no queda ninguna de las dos fórmulas en el sitio (Contact, BookingForm, /turnos, /nosotros, /servicios y las páginas de área). El cliente evalúa un esquema alternativo (p. ej. mencionar productores con convenio, o aclarar la gratuidad recién al confirmar el turno) pero todavía no lo definió — no reintroducir ese lenguaje sin confirmación explícita del cliente.

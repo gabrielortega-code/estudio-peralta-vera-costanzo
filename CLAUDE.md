@@ -148,3 +148,59 @@ Antecedentes:
 - El tono del copy es **profesional pero accesible**: evitar lenguaje excesivamente técnico-legal en secciones dirigidas al cliente final.
 - El cliente aprobó tanto la versión larga como la versión con íconos de los diferenciales — elegir según el componente que corresponda.
 - **Nada de "sin cargo/gratis" NI de "sin compromiso"**: el código de ética profesional no permite ofrecer la primera consulta como gratuita, y en la reunión con Javier Peralta el cliente pidió eliminar además toda referencia a "primera consulta sin compromiso". Hoy no queda ninguna de las dos fórmulas en el sitio (Contact, BookingForm, /turnos, /nosotros, /servicios y las páginas de área). El cliente evalúa un esquema alternativo (p. ej. mencionar productores con convenio, o aclarar la gratuidad recién al confirmar el turno) pero todavía no lo definió — no reintroducir ese lenguaje sin confirmación explícita del cliente.
+
+---
+
+## Infraestructura: dos cosas que hay que saber antes de tocar nada
+
+> La versión extendida de esto está en `SETUP.md`, que **no está versionado**
+> (lo ignora `.gitignore` junto con `Branding/` y `docs/`). Este resumen sí viaja
+> con el repo.
+
+### 🔴 Los avisos de turno al estudio no llegan
+
+El servidor de correo del estudio (`c205.dattaweb.com`, hosting DonWeb) **rechaza
+los correos que manda Brevo**: `550 5.7.1 Blacklisted [France, Europe]`. Brevo
+envía desde rangos europeos y DonWeb los tiene en lista negra. El bloqueo es **a
+nivel servidor**, así que cualquier dirección `@estudiojuridicoperalta.com`
+alojada ahí rebota igual — no se arregla cambiando `EMAIL_ADMIN` a otra casilla
+del mismo dominio.
+
+Los correos **al cliente sí funcionan** (verificado contra Hotmail). El problema
+es solo el aviso interno.
+
+Opción recomendada, pendiente de decisión del cliente: mandar el aviso interno por
+el **SMTP propio de DonWeb** (`mail.estudiojuridicoperalta.com:465`, autenticado
+con una casilla `turnos@estudiojuridicoperalta.com`), y dejar Brevo para los
+correos al cliente. La entrega autenticada al propio servidor no pasa por el
+filtro de listas negras.
+
+Mientras tanto el estudio ve las reservas en `/admin`, que se refresca solo cada
+60 segundos.
+
+⚠️ **No mandar correos de prueba a casillas `@estudiojuridicoperalta.com`**: los
+rebotes acumulados hacen que Brevo agregue la dirección a su lista de bloqueados y
+después falle en silencio.
+
+### El sitio se publica en `www`, no en la raíz
+
+`NEXT_PUBLIC_SITE_URL` es `https://www.estudiojuridicoperalta.com` y ese es el
+dominio canónico. La raíz se queda apuntando a DonWeb y redirige con un 301 desde
+el `.htaccess` del hosting.
+
+No es una preferencia estética: en la zona DNS, `autodiscover` y `autoconfig` —los
+nombres que Outlook usa para configurarse— son CNAME apuntando a la raíz. Un
+intento anterior de mover la raíz a Vercel se los llevó puestos y **cortó el correo
+del estudio**. Dejando la raíz quieta, el único cambio de DNS es el CNAME de `www`,
+del que no depende nada del correo.
+
+Si alguna vez se lleva la raíz a Vercel: desacoplar primero `autodiscover` y
+`autoconfig` (de CNAME a registro A directo a `200.58.112.97`), y **eliminar el
+registro AAAA de la raíz**, o todos los visitantes con IPv6 siguen viendo el sitio
+viejo.
+
+### Remitente de Brevo
+
+`EMAIL_FROM` es `turnos@mail.estudiojuridicoperalta.com`. Ese **subdominio** está
+autenticado en Brevo (DKIM + verificación por DNS); el dominio raíz **no**. No
+cambiarlo al raíz "para que quede más prolijo": se cae la entregabilidad.

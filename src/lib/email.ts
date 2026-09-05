@@ -1,4 +1,16 @@
-// Envío de emails transaccionales vía Brevo (https://api.brevo.com/v3/smtp/email).
+// Envío de emails transaccionales. Dos canales, a propósito:
+//
+//   - Al cliente, vía Brevo. Es donde importa la entregabilidad hacia dominios
+//     externos (Gmail, Hotmail, etc.) y hoy funciona bien.
+//   - Al estudio, vía el SMTP propio del hosting. El servidor de DonWeb rechaza
+//     los correos de Brevo con "550 5.7.1 Blacklisted [France, Europe]", así que
+//     el aviso interno nunca llegaba. Autenticándonos contra el mismo servidor
+//     que aloja las casillas, la entrega es local y no pasa por ese filtro.
+//
+// El aviso interno NO cae de vuelta a Brevo si el SMTP falla: cada rebote acerca
+// la dirección a la lista de bloqueados de Brevo, donde después falla en silencio.
+
+import nodemailer, { type Transporter } from "nodemailer";
 
 import { whatsappHref } from "./site";
 
@@ -47,6 +59,56 @@ async function sendBrevoEmail(params: {
     const detail = await res.text().catch(() => "");
     throw new Error(`Brevo respondió ${res.status}: ${detail}`);
   }
+}
+
+// Reutilizamos el transporte entre invocaciones: con Fluid Compute la instancia
+// sobrevive a la request y así evitamos rehacer el handshake TLS en cada turno.
+let cachedTransporter: Transporter | null = null;
+
+function getSmtpTransport(): Transporter | null {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) return null;
+
+  if (!cachedTransporter) {
+    const port = Number(process.env.SMTP_PORT ?? 465);
+    cachedTransporter = nodemailer.createTransport({
+      host,
+      port,
+      // 465 es TLS implícito; 587 arranca en claro y sube con STARTTLS.
+      secure: port === 465,
+      auth: { user, pass },
+      // El servidor publica un AAAA pero no escucha en IPv6, así que nodemailer
+      // intenta esa dirección y cae a IPv4. El rechazo es inmediato, no un
+      // timeout, así que no vale la pena forzar la familia de direcciones.
+      //
+      // Estos límites sí importan: sin ellos, un servidor que no responde deja
+      // colgada la función hasta el timeout de la plataforma.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
+    });
+  }
+
+  return cachedTransporter;
+}
+
+async function sendSmtpEmail(params: {
+  to: string;
+  subject: string;
+  htmlContent: string;
+}): Promise<void> {
+  const transport = getSmtpTransport();
+  if (!transport) throw new Error("SMTP no está configurado");
+
+  await transport.sendMail({
+    from: { name: SENDER_NAME, address: process.env.SMTP_USER as string },
+    to: params.to,
+    subject: params.subject,
+    html: params.htmlContent,
+  });
 }
 
 export async function sendConfirmacionCliente(turno: TurnoData): Promise<void> {
@@ -104,9 +166,26 @@ export async function sendNotificacionAdmin(turno: TurnoData): Promise<void> {
     </div>
   `;
 
+  const subject = `Nuevo turno: ${turno.nombre} — ${turno.fecha} ${turno.horaInicio}hs`;
+
+  if (getSmtpTransport()) {
+    // Camino normal. Si falla, se registra y el estudio ve la reserva en /admin;
+    // no reintentamos por Brevo para no generar rebotes.
+    try {
+      await sendSmtpEmail({ to: adminEmail, subject, htmlContent: html });
+    } catch (err) {
+      console.error("No se pudo avisar al estudio por SMTP:", err);
+    }
+    return;
+  }
+
+  // Sin SMTP configurado queda el comportamiento anterior, que hoy rebota en el
+  // servidor del estudio. Es un fallback para entornos donde no hay credenciales
+  // (desarrollo, previews), no una alternativa válida en producción.
+  console.warn("SMTP no configurado: el aviso al estudio sale por Brevo y probablemente rebote");
   await sendBrevoEmail({
     to: [{ email: adminEmail }],
-    subject: `Nuevo turno: ${turno.nombre} — ${turno.fecha} ${turno.horaInicio}hs`,
+    subject,
     htmlContent: html,
   });
 }

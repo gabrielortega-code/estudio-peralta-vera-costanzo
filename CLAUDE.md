@@ -151,13 +151,13 @@ Antecedentes:
 
 ---
 
-## Infraestructura: dos cosas que hay que saber antes de tocar nada
+## Infraestructura: lo que hay que saber antes de tocar nada
 
 > La versión extendida de esto está en `SETUP.md`, que **no está versionado**
 > (lo ignora `.gitignore` junto con `Branding/` y `docs/`). Este resumen sí viaja
 > con el repo.
 
-### 🔴 Los avisos de turno al estudio no llegan
+### Los correos salen por dos canales distintos, a propósito
 
 El servidor de correo del estudio (`c205.dattaweb.com`, hosting DonWeb) **rechaza
 los correos que manda Brevo**: `550 5.7.1 Blacklisted [France, Europe]`. Brevo
@@ -166,27 +166,51 @@ nivel servidor**, así que cualquier dirección `@estudiojuridicoperalta.com`
 alojada ahí rebota igual — no se arregla cambiando `EMAIL_ADMIN` a otra casilla
 del mismo dominio.
 
-Los correos **al cliente sí funcionan** (verificado contra Hotmail). El problema
-es solo el aviso interno.
+Por eso `src/lib/email.ts` tiene dos canales:
 
-Opción recomendada, pendiente de decisión del cliente: mandar el aviso interno por
-el **SMTP propio de DonWeb** (`mail.estudiojuridicoperalta.com:465`, autenticado
-con una casilla `turnos@estudiojuridicoperalta.com`), y dejar Brevo para los
-correos al cliente. La entrega autenticada al propio servidor no pasa por el
-filtro de listas negras.
+| Correo | Canal | Por qué |
+|---|---|---|
+| Confirmación **al cliente** | Brevo | Va a dominios externos (Gmail, Hotmail); ahí la entregabilidad de Brevo es buena |
+| Aviso de turno nuevo **al estudio** | SMTP propio del hosting | Entrega local dentro del mismo servidor: no pasa por el filtro de listas negras |
 
-Mientras tanto el estudio ve las reservas en `/admin`, que se refresca solo cada
-60 segundos.
+Configuración del SMTP (cuatro variables, en `.env` y en Vercel):
 
-⚠️ **No mandar correos de prueba a casillas `@estudiojuridicoperalta.com`**: los
-rebotes acumulados hacen que Brevo agregue la dirección a su lista de bloqueados y
-después falle en silencio.
+```
+SMTP_HOST = c205.ferozo.com
+SMTP_PORT = 465
+SMTP_USER = turnero@estudiojuridicoperalta.com
+SMTP_PASS = (la de esa casilla)
+```
+
+⚠️ **El host es `c205.ferozo.com`, no `mail.estudiojuridicoperalta.com`.** Los dos
+resuelven a `200.58.112.97`, pero el servidor presenta un certificado
+`CN=*.ferozo.com` que no cubre el dominio del estudio. Con el otro nombre falla la
+verificación TLS y habría que desactivarla; con este valida limpio.
+
+`turnero@` es **solo el remitente**. El destinatario sigue siendo `EMAIL_ADMIN`
+(`javier@estudiojuridicoperalta.com`), en su casilla de siempre. La casilla ya
+existía sin uso en el hosting y se reutilizó; se administra desde el panel de
+DonWeb, en Correos.
+
+El aviso interno **no reintenta por Brevo** si el SMTP falla: cada rebote acerca la
+dirección a la lista de bloqueados de Brevo, donde después falla en silencio. Si
+falla, se registra en el log y el estudio ve la reserva en `/admin`, que se
+refresca solo cada 60 segundos. El fallback a Brevo queda activo únicamente cuando
+no hay variables SMTP, o sea en desarrollo y previews.
+
+⚠️ **No mandar correos de prueba *por Brevo* a casillas
+`@estudiojuridicoperalta.com`**: los rebotes acumulados hacen que Brevo agregue la
+dirección a su lista de bloqueados y después falle en silencio. Por el SMTP propio
+no aplica: Brevo no participa y probar contra esas casillas es seguro.
 
 ### El sitio se publica en `www`, no en la raíz
 
 `NEXT_PUBLIC_SITE_URL` es `https://www.estudiojuridicoperalta.com` y ese es el
 dominio canónico. La raíz se queda apuntando a DonWeb y redirige con un 301 desde
-el `.htaccess` del hosting.
+el `.htaccess` del hosting. **Conectado el 04/09/2026**: el CNAME de `www` apunta a
+`90816cf90d9467b7.vercel-dns-017.com` (valor propio del proyecto, no el genérico
+`cname.vercel-dns.com`) y el redirect de la raíz está acotado por `HTTP_HOST`,
+porque el `.com` y el `.site` comparten document root.
 
 No es una preferencia estética: en la zona DNS, `autodiscover` y `autoconfig` —los
 nombres que Outlook usa para configurarse— son CNAME apuntando a la raíz. Un

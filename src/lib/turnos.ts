@@ -72,6 +72,56 @@ export const HORARIOS = [
   "17:30",
 ];
 
+/* ------------------------- duración y solapamiento ----------------------- */
+
+/** Duración de una consulta, en minutos. */
+export const DURACION_MIN = 60;
+
+/** Estados que mantienen el horario ocupado (todos menos CANCELADO). */
+export const ESTADOS_QUE_OCUPAN: EstadoTurno[] = [
+  "PENDIENTE",
+  "CONFIRMADO",
+  "COMPLETADO",
+];
+
+/** "HH:MM" → minutos desde la medianoche. */
+export function horaToMin(hora: string): number {
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/** Minutos desde la medianoche → "HH:MM". */
+export function minToHora(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Hora de finalización de un turno que empieza a `horaInicio`. */
+export function horaFinDe(horaInicio: string): string {
+  return minToHora(horaToMin(horaInicio) + DURACION_MIN);
+}
+
+/**
+ * Dos turnos se solapan si empiezan a menos de una duración de distancia.
+ * Con turnos de 1 h y slots cada 30 min, las 10:00 y las 10:30 chocan.
+ */
+export function seSolapan(horaA: string, horaB: string): boolean {
+  return Math.abs(horaToMin(horaA) - horaToMin(horaB)) < DURACION_MIN;
+}
+
+/**
+ * Horarios de `HORARIOS` que quedan bloqueados por las reservas de un día.
+ * Fuente de verdad compartida por el formulario, el panel y la API.
+ */
+export function slotsOcupados(
+  reservas: { horaInicio: string }[]
+): string[] {
+  return HORARIOS.filter((slot) =>
+    reservas.some((r) => seSolapan(slot, r.horaInicio))
+  );
+}
+
 export const ESTADO_META: Record<
   EstadoTurno,
   { label: string; dot: string; pill: string; ring: string }

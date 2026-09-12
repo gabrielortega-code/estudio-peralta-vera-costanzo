@@ -7,7 +7,10 @@ import {
   type EstadoTurno,
   type LinkSettings,
   ESTADO_META,
+  ESTADOS_QUE_OCUPAN,
   HORARIOS,
+  horaFinDe,
+  slotsOcupados,
   toDateKey,
   addDays,
   turnoDateKey,
@@ -34,15 +37,6 @@ import {
 import CalendarConfigPanel from "./CalendarConfigPanel";
 
 /* ------------------------------- helpers -------------------------------- */
-
-function addHour(hora: string): string {
-  const [h, m] = hora.split(":").map(Number);
-  const d = new Date();
-  d.setHours(h + 1, m, 0, 0);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(
-    d.getMinutes()
-  ).padStart(2, "0")}`;
-}
 
 function StatusPill({ estado }: { estado: EstadoTurno }) {
   const meta = ESTADO_META[estado];
@@ -200,16 +194,49 @@ export default function AdminPanel() {
 
   /** Actualiza el turno en memoria y persiste en la API. */
   function mutate(id: string, patch: Partial<Turno>, msg?: string) {
+    const anterior = turnos.find((t) => t.id === id);
+
+    // Revierte el cambio optimista cuando el servidor lo rechaza
+    // (por ejemplo, si el horario ya está ocupado por otro turno).
+    function revertir(error: string) {
+      if (anterior) {
+        setTurnos((prev) => prev.map((t) => (t.id === id ? anterior : t)));
+        setSelected((sel) => (sel && sel.id === id ? anterior : sel));
+      }
+      notify(error);
+    }
+
     setTurnos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...patch } : t))
     );
     setSelected((sel) => (sel && sel.id === id ? { ...sel, ...patch } : sel));
+
     fetch("/api/admin/turnos", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...patch }),
-    }).catch(() => {});
-    if (msg) notify(msg);
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          revertir(json.error ?? "No se pudo guardar el cambio");
+          return;
+        }
+        if (msg) notify(msg);
+      })
+      .catch(() => revertir("Sin conexión: el cambio no se guardó"));
+  }
+
+  /** Horarios bloqueados de un día, ignorando opcionalmente un turno. */
+  function ocupadosDe(dk: string, excluirId?: string): string[] {
+    return slotsOcupados(
+      turnos.filter(
+        (t) =>
+          t.id !== excluirId &&
+          turnoDateKey(t) === dk &&
+          ESTADOS_QUE_OCUPAN.includes(t.estado)
+      )
+    );
   }
 
   /* ------------------------------ derived ------------------------------ */
@@ -638,6 +665,7 @@ export default function AdminPanel() {
           onSaveNota={(notaAdmin) =>
             mutate(selected.id, { notaAdmin }, "Nota guardada")
           }
+          ocupadosDe={ocupadosDe}
         />
       )}
 
@@ -1026,6 +1054,7 @@ function TurnoDrawer({
   onConfirmVirtual,
   onReschedule,
   onSaveNota,
+  ocupadosDe,
 }: {
   turno: Turno;
   settings: LinkSettings;
@@ -1034,6 +1063,7 @@ function TurnoDrawer({
   onConfirmVirtual: (enlace: string | null) => void;
   onReschedule: (fecha: string, horaInicio: string, horaFin: string) => void;
   onSaveNota: (nota: string) => void;
+  ocupadosDe: (dateKey: string, excluirId?: string) => string[];
 }) {
   const [tab, setTab] = useState<"acciones" | "reprogramar">("acciones");
   const [nota, setNota] = useState(turno.notaAdmin ?? "");
@@ -1043,6 +1073,10 @@ function TurnoDrawer({
     turno.enlace || defaultLinkFor(turno.canal, settings)
   );
   const todayKey = toDateKey(new Date());
+
+  // Horarios que ya están tomados el día al que se quiere mover el turno
+  const ocupados = ocupadosDe(newDate, turno.id);
+  const horaOcupada = ocupados.includes(newHora);
 
   const esVirtual = turno.modalidad === "Virtual";
   const esWhatsapp = turno.canal === "WhatsApp (videollamada)";
@@ -1356,20 +1390,30 @@ function TurnoDrawer({
                       onChange={(e) => setNewHora(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-500"
                     >
-                      {HORARIOS.map((h) => (
-                        <option key={h} value={h}>
-                          {h} hs
-                        </option>
-                      ))}
+                      {HORARIOS.map((h) => {
+                        const tomado = ocupados.includes(h);
+                        return (
+                          <option key={h} value={h} disabled={tomado}>
+                            {h} hs{tomado ? " — ocupado" : ""}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
+                {horaOcupada && (
+                  <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-2">
+                    Ese horario ya está ocupado por otro turno (las consultas
+                    duran 1 hora). Elegí otro para poder reprogramar.
+                  </p>
+                )}
                 <button
                   onClick={() => {
-                    onReschedule(newDate, newHora, addHour(newHora));
+                    onReschedule(newDate, newHora, horaFinDe(newHora));
                     setTab("acciones");
                   }}
-                  className="w-full bg-navy-900 hover:bg-navy-800 text-white font-semibold py-2.5 rounded-lg text-sm"
+                  disabled={horaOcupada}
+                  className="w-full bg-navy-900 hover:bg-navy-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm"
                 >
                   Guardar nueva fecha y confirmar
                 </button>

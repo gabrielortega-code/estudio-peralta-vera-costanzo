@@ -46,6 +46,33 @@ export default function BookingForm() {
 
   const modalidadDia: ModalidadDia = getModalidadForDate(calConfig, fecha);
 
+  // Horarios ya tomados para la fecha elegida
+  const [horario, setHorario] = useState("");
+  const [ocupados, setOcupados] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  // Se incrementa para forzar una recarga de la disponibilidad
+  const [slotsNonce, setSlotsNonce] = useState(0);
+
+  useEffect(() => {
+    let cancelado = false;
+    setLoadingSlots(true);
+    fetch(`/api/turnos/disponibilidad?fecha=${fecha}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (cancelado) return;
+        const tomados: string[] = Array.isArray(d?.ocupados) ? d.ocupados : [];
+        setOcupados(tomados);
+        // Si el horario elegido se ocupó mientras tanto, lo soltamos
+        setHorario(h => (h && tomados.includes(h) ? "" : h));
+      })
+      .catch(() => { if (!cancelado) setOcupados([]); })
+      .finally(() => { if (!cancelado) setLoadingSlots(false); });
+    return () => { cancelado = true; };
+  }, [fecha, slotsNonce]);
+
+  const sinHorarios =
+    !loadingSlots && HORARIOS.every(h => ocupados.includes(h));
+
   // Sincroniza modalidad cuando el día solo permite una opción
   useEffect(() => {
     if (modalidadDia === "presencial") setModalidad("Presencial");
@@ -91,6 +118,11 @@ export default function BookingForm() {
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          // Alguien reservó ese horario primero: refrescamos la grilla
+          setHorario("");
+          setSlotsNonce(n => n + 1);
+        }
         throw new Error(json.error || "Error al procesar la solicitud");
       }
 
@@ -347,15 +379,35 @@ export default function BookingForm() {
             <select
               name="horaInicio"
               required
-              className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500 focus:border-transparent bg-white"
+              value={horario}
+              onChange={e => setHorario(e.target.value)}
+              disabled={loadingSlots || sinHorarios || modalidadDia === "bloqueado"}
+              className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500 focus:border-transparent bg-white disabled:bg-gray-100 disabled:text-gray-400"
             >
-              <option value="">Seleccioná un horario…</option>
-              {HORARIOS.map((h) => (
-                <option key={h} value={h}>{h} hs</option>
-              ))}
+              <option value="">
+                {loadingSlots
+                  ? "Cargando horarios…"
+                  : sinHorarios
+                  ? "Sin horarios disponibles"
+                  : "Seleccioná un horario…"}
+              </option>
+              {HORARIOS.map((h) => {
+                const tomado = ocupados.includes(h);
+                return (
+                  <option key={h} value={h} disabled={tomado}>
+                    {h} hs{tomado ? " — reservado" : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
+        {sinHorarios && modalidadDia !== "bloqueado" && (
+          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+            No quedan horarios disponibles para esa fecha. Por favor, elegí otro
+            día.
+          </div>
+        )}
         <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5 text-gold-500" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
@@ -388,13 +440,18 @@ export default function BookingForm() {
       )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800">
-        Un especialista se comunicará para confirmar la disponibilidad del
-        horario.
+        El horario queda reservado a tu nombre. Un especialista se comunicará
+        para confirmar la consulta.
       </div>
 
       <button
         type="submit"
-        disabled={state === "loading" || modalidadDia === "bloqueado"}
+        disabled={
+          state === "loading" ||
+          modalidadDia === "bloqueado" ||
+          loadingSlots ||
+          sinHorarios
+        }
         className="w-full bg-navy-900 hover:bg-navy-800 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded transition-colors duration-200 flex items-center justify-center gap-2"
       >
         {state === "loading" ? (

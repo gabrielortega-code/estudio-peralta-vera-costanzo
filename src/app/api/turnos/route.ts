@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendConfirmacionCliente, sendNotificacionAdmin } from "@/lib/email";
 import { DEFAULT_CALENDAR, getModalidadForDate, type CalendarConfigData } from "@/lib/calendar";
+import { horaFinDe } from "@/lib/turnos";
+import {
+  assertHorarioLibre,
+  esHorarioValido,
+  lockFecha,
+  SlotOcupadoError,
+} from "@/lib/disponibilidad";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +19,13 @@ export async function POST(req: NextRequest) {
     if (!nombre || !email || !telefono || !fecha || !horaInicio) {
       return NextResponse.json(
         { error: "Faltan campos obligatorios" },
+        { status: 400 }
+      );
+    }
+
+    if (!esHorarioValido(horaInicio)) {
+      return NextResponse.json(
+        { error: "El horario seleccionado no es válido." },
         { status: 400 }
       );
     }
@@ -61,25 +75,29 @@ export async function POST(req: NextRequest) {
       // Si el calendario no está configurado, se permite todo
     }
 
-    // Calculate end time (1 hour later)
-    const [hours, minutes] = horaInicio.split(":").map(Number);
-    const endHours = hours + 1;
-    const horaFin = `${String(endHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    const horaFin = horaFinDe(horaInicio);
 
-    // Save to database
-    const turno = await prisma.turno.create({
-      data: {
-        nombre,
-        email,
-        telefono,
-        dni: dni || null,
-        modalidad: modalidad || null,
-        canal: modalidad === "Virtual" ? canal || null : null,
-        fecha: fechaDate,
-        horaInicio,
-        horaFin,
-        mensaje: mensaje || null,
-      },
+    // El lock de la fecha + la verificación + el alta van en una sola
+    // transacción: dos reservas simultáneas del mismo horario se resuelven
+    // una después de la otra y la segunda encuentra el horario tomado.
+    const turno = await prisma.$transaction(async (tx) => {
+      await lockFecha(tx, dateKey);
+      await assertHorarioLibre(tx, dateKey, horaInicio);
+
+      return tx.turno.create({
+        data: {
+          nombre,
+          email,
+          telefono,
+          dni: dni || null,
+          modalidad: modalidad || null,
+          canal: modalidad === "Virtual" ? canal || null : null,
+          fecha: fechaDate,
+          horaInicio,
+          horaFin,
+          mensaje: mensaje || null,
+        },
+      });
     });
 
     // Send emails (non-blocking - don't fail if email fails)
@@ -107,6 +125,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, id: turno.id }, { status: 201 });
   } catch (error) {
+    if (error instanceof SlotOcupadoError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     console.error("Error creating turno:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },

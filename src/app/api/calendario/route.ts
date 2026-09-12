@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_CALENDAR } from "@/lib/calendar";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const record = await (prisma as any).calendarConfig.findUnique({

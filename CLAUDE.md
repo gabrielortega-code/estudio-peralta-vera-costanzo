@@ -235,8 +235,13 @@ a los 10 minutos, un solo uso, 5 intentos, máximo 3 códigos por hora).
   parámetros adentro, así que se pueden cambiar sin invalidar los hashes viejos.
 - El código del segundo factor sale por el **SMTP propio del hosting**, nunca por
   Brevo, por lo mismo que el aviso de turnos (ver más arriba).
-- El alta inicial y la recuperación se hacen con `npm run admin:password`, un
-  script de línea de comandos. No hay registro público, a propósito.
+- **La primera contraseña se define desde el navegador.** Mientras no haya
+  administrador, `/admin` muestra una pantalla de instalación que pide la clave
+  de instalación (`ADMIN_SECRET`), el email y la contraseña nueva. Se cierra
+  sola apenas queda un administrador creado: a partir de ahí
+  `POST /api/admin/bootstrap` devuelve 409 y la única forma de cambiar la
+  contraseña es sabiendo la actual. `npm run admin:password` sigue existiendo
+  como recuperación si Javier se la olvida. No hay registro público.
 - Cambiar la contraseña incrementa `tokenVersion` y con eso **cierra todas las
   sesiones abiertas** y da de baja los dispositivos de confianza: las dos cookies
   llevan la versión adentro de la firma.
@@ -273,6 +278,26 @@ dos de quien administra el sitio, no del cliente:
 
 Por eso tiene que ser un valor aleatorio largo y **no** hay que compartirla con
 el cliente.
+
+### El schema se aplica en el deploy, no a mano
+
+El proyecto no usa migraciones versionadas: el schema se sincroniza con
+`prisma db push`. Para que un deploy no pueda adelantarse a su propia migración
+—y dejar al panel pidiendo tablas que todavía no existen—, el push corre como
+parte del build en Vercel:
+
+```json
+"vercel-build": "prisma generate && prisma db push && next build"
+```
+
+Vercel prefiere `vercel-build` sobre `build` cuando existe, así que el `npm run
+build` local sigue sin necesitar base. `prisma db push` es idempotente y se
+niega a correr si el cambio implicara pérdida de datos, así que un schema
+destructivo falla el build en vez de desplegarse.
+
+⚠️ El push corre también en los deploys de preview, y el proyecto tiene una sola
+base. Un cambio de schema en una rama toca la base de producción apenas se
+despliega esa preview.
 
 ### Turnos: la exclusión de horarios vive en la aplicación
 

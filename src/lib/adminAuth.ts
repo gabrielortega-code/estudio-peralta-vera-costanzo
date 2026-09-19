@@ -8,6 +8,7 @@ import {
   type ScryptOptions,
 } from "crypto";
 import { promisify } from "util";
+import { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -231,14 +232,28 @@ export async function isTrustedDevice(
   return validarToken("dispositivo", token, await getAdminUser()) !== null;
 }
 
+/**
+ * El administrador del panel, o null si todavía no hay ninguno.
+ *
+ * Devuelve null también cuando la tabla no existe, que es el estado normal de
+ * un entorno recién levantado sin `prisma db push`. Cualquier otro error de
+ * base se propaga: confundir "la base no responde" con "no hay administrador"
+ * haría que el panel ofreciera configurarse de nuevo.
+ */
 export async function getAdminUser() {
   try {
     return await (prisma as any).adminUser.findUnique({
       where: { id: ADMIN_USER_ID },
     });
-  } catch {
-    // Tabla todavía no creada (`prisma db push` pendiente).
-    return null;
+  } catch (error) {
+    // P2021 = la tabla no existe en la base actual.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2021"
+    ) {
+      return null;
+    }
+    throw error;
   }
 }
 

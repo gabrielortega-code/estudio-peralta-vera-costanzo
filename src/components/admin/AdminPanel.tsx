@@ -65,8 +65,11 @@ const ESTADO_FILTERS: { value: "TODOS" | EstadoTurno; label: string }[] = [
 export default function AdminPanel({
   /** El servidor ya miró la cookie: si no hay sesión, vamos directo al login. */
   sesionActiva = false,
+  /** Panel recién desplegado: todavía nadie definió una contraseña. */
+  necesitaSetup = false,
 }: {
   sesionActiva?: boolean;
+  necesitaSetup?: boolean;
 }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [checkingSession, setCheckingSession] = useState(sesionActiva);
@@ -84,6 +87,9 @@ export default function AdminPanel({
   } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [recordarDispositivo, setRecordarDispositivo] = useState(false);
+  // Deja de mostrar la pantalla de instalación en cuanto la contraseña quedó
+  // definida, sin depender de que el servidor vuelva a renderizar la página.
+  const [yaConfigurado, setYaConfigurado] = useState(false);
 
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [view, setView] = useState<"dia" | "mes">("dia");
@@ -397,7 +403,20 @@ export default function AdminPanel({
             <p className="text-gray-400 text-sm">Peralta &amp; Vera Costanzo</p>
           </div>
 
-          {desafio ? (
+          {necesitaSetup && !yaConfigurado ? (
+            <SetupForm
+              onListo={async () => {
+                setYaConfigurado(true);
+                try {
+                  await entrarAlPanel();
+                } catch {
+                  setLoginError(
+                    "La contraseña quedó guardada, pero no pudimos cargar los turnos. Recargá la página."
+                  );
+                }
+              }}
+            />
+          ) : desafio ? (
             <form
               onSubmit={handleVerificar}
               className="bg-white rounded-xl shadow-xl p-6 space-y-4"
@@ -1701,6 +1720,156 @@ function ActionBtn({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Primera puesta en marcha del panel: todavía no hay contraseña definida.
+ *
+ * Se protege con la clave de instalación (`ADMIN_SECRET`, que tiene quien
+ * administra el sitio) y desaparece para siempre apenas queda un administrador
+ * creado.
+ */
+function SetupForm({ onListo }: { onListo: () => void }) {
+  const [secret, setSecret] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [repetir, setRepetir] = useState("");
+  const [ver, setVer] = useState(false);
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const puedeGuardar =
+    Boolean(secret) &&
+    email.includes("@") &&
+    password.length >= PASSWORD_MIN &&
+    password === repetir &&
+    !guardando;
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    setGuardando(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/bootstrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret, email, password }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "No se pudo configurar el panel.");
+        return;
+      }
+      onListo();
+    } catch {
+      setError("Sin conexión con el servidor. Probá de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <form onSubmit={guardar} className="bg-white rounded-xl shadow-xl p-6 space-y-4">
+      <div>
+        <h2 className="font-serif font-bold text-navy-900 text-lg">
+          Configurá tu acceso
+        </h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Es la primera vez que se entra a este panel. Elegí la contraseña con la
+          que vas a ingresar de ahora en más.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Clave de instalación
+        </label>
+        <input
+          type="password"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+          placeholder="Te la pasa quien administra el sitio"
+          autoFocus
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Tu email
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+          placeholder="nombre@estudiojuridicoperalta.com"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Ahí van a llegar los códigos de acceso cada vez que entres desde una
+          computadora nueva.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Contraseña
+        </label>
+        <div className="relative">
+          <input
+            type={ver ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            className="w-full border border-gray-300 rounded-lg pl-3 pr-16 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+          />
+          <button
+            type="button"
+            onClick={() => setVer((v) => !v)}
+            className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+          >
+            {ver ? "Ocultar" : "Ver"}
+          </button>
+        </div>
+        <p
+          className={`text-xs mt-1 ${
+            password.length > 0 && password.length < PASSWORD_MIN
+              ? "text-rose-600"
+              : "text-gray-400"
+          }`}
+        >
+          Al menos {PASSWORD_MIN} caracteres. Cuanto más larga, mejor.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Repetila
+        </label>
+        <input
+          type={ver ? "text" : "password"}
+          value={repetir}
+          onChange={(e) => setRepetir(e.target.value)}
+          autoComplete="new-password"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+        />
+        {repetir.length > 0 && password !== repetir && (
+          <p className="text-xs text-rose-600 mt-1">Las contraseñas no coinciden.</p>
+        )}
+      </div>
+
+      {error && <p className="text-rose-600 text-xs">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={!puedeGuardar}
+        className="w-full bg-navy-900 hover:bg-navy-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors"
+      >
+        {guardando ? "Guardando…" : "Guardar y entrar"}
+      </button>
+    </form>
   );
 }
 

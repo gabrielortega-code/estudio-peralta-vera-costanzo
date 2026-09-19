@@ -38,10 +38,9 @@ export const metadata: Metadata = {
     description:
       "Especialistas en Derecho de Seguros y Daños. Defendemos los derechos del asegurado desde hace más de 14 años.",
   },
-  icons: {
-    icon: "/branding/isologo-oscuro.png",
-    apple: "/branding/isologo-oscuro.png",
-  },
+  // Sin bloque `icons`: los archivos favicon.ico, icon.png y apple-icon.png de
+  // src/app/ los detecta Next y emite los <link> solo. Declararlos acá los pisaría.
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

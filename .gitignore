@@ -36,9 +36,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Archivos de referencia del cliente (no son parte del código)
-Branding/
-docs/
-Miembros Estudio Juridico Peralta Vera 2/
-SETUP.md
+# Archivos de referencia del cliente (no son parte del código).
+# Van anclados a la raíz con "/": sin la barra, git los matchea en cualquier
+# nivel y —en macOS, que ignora mayúsculas— "Branding/" se llevaba puesto
+# también a public/branding/, que sí es parte del sitio.
+/Branding/
+/docs/
+/Miembros Estudio Juridico Peralta Vera 2/
+/SETUP.md
 .env*

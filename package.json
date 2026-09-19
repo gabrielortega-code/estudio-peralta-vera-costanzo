@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "admin:password": "node scripts/admin-set-password.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",

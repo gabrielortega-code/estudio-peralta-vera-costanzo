@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendConfirmacionCliente, sendNotificacionAdmin } from "@/lib/email";
-import { DEFAULT_CALENDAR, getModalidadForDate, type CalendarConfigData } from "@/lib/calendar";
-import { horaFinDe } from "@/lib/turnos";
+import {
+  getModalidadForDate,
+  horariosHabilitados,
+  type CalendarConfigData,
+} from "@/lib/calendar";
+import { horaFinDe, hoyEnArgentina } from "@/lib/turnos";
 import {
   assertHorarioLibre,
   esHorarioValido,
+  leerCalendarConfig,
   lockFecha,
   SlotOcupadoError,
 } from "@/lib/disponibilidad";
@@ -36,43 +41,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Fecha inválida" }, { status: 400 });
     }
 
-    // Regla: no se reservan turnos para hoy ni en menos de 24 hs.
-    const tomorrow = new Date();
-    tomorrow.setHours(0, 0, 0, 0);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    if (fechaDate < tomorrow) {
+    // Regla: no se reservan turnos para hoy ni en menos de 24 hs. La comparación
+    // va en hora argentina y no en la del servidor: en Vercel el servidor está
+    // en UTC y después de las 21:00 de acá ya pasó al día siguiente.
+    const dateKey = fechaDate.toISOString().slice(0, 10);
+    if (dateKey <= hoyEnArgentina()) {
       return NextResponse.json(
         { error: "Los turnos se reservan a partir del día siguiente (no para hoy ni en menos de 24 hs)." },
         { status: 400 }
       );
     }
 
-    // Validación contra la configuración del calendario
-    const dateKey = fechaDate.toISOString().slice(0, 10);
+    // Validación contra la configuración del calendario. Si la base falla acá
+    // cortamos: dejar pasar la reserva significaría permitir un día o un horario
+    // que el estudio bloqueó desde el panel.
+    let calConfig: CalendarConfigData;
     try {
-      const calRecord = await (prisma as any).calendarConfig.findUnique({ where: { id: "main" } });
-      const calConfig: CalendarConfigData = calRecord?.config ?? DEFAULT_CALENDAR;
-      const modalidadDia = getModalidadForDate(calConfig, dateKey);
-      if (modalidadDia === "bloqueado") {
-        return NextResponse.json(
-          { error: "El estudio no atiende en esa fecha. Por favor elegí otro día." },
-          { status: 400 }
-        );
-      }
-      if (modalidadDia === "presencial" && modalidad === "Virtual") {
-        return NextResponse.json(
-          { error: "En esa fecha solo se ofrecen consultas presenciales." },
-          { status: 400 }
-        );
-      }
-      if (modalidadDia === "virtual" && modalidad === "Presencial") {
-        return NextResponse.json(
-          { error: "En esa fecha solo se ofrecen consultas virtuales." },
-          { status: 400 }
-        );
-      }
-    } catch {
-      // Si el calendario no está configurado, se permite todo
+      calConfig = await leerCalendarConfig();
+    } catch (error) {
+      console.error("Error leyendo la configuración del calendario:", error);
+      return NextResponse.json(
+        { error: "No pudimos verificar la disponibilidad. Probá de nuevo en unos minutos." },
+        { status: 503 }
+      );
+    }
+
+    const modalidadDia = getModalidadForDate(calConfig, dateKey);
+    if (modalidadDia === "bloqueado") {
+      return NextResponse.json(
+        { error: "El estudio no atiende en esa fecha. Por favor elegí otro día." },
+        { status: 400 }
+      );
+    }
+    if (modalidadDia === "presencial" && modalidad === "Virtual") {
+      return NextResponse.json(
+        { error: "En esa fecha solo se ofrecen consultas presenciales." },
+        { status: 400 }
+      );
+    }
+    if (modalidadDia === "virtual" && modalidad === "Presencial") {
+      return NextResponse.json(
+        { error: "En esa fecha solo se ofrecen consultas virtuales." },
+        { status: 400 }
+      );
+    }
+    if (!horariosHabilitados(calConfig, dateKey).includes(horaInicio)) {
+      return NextResponse.json(
+        { error: "El estudio no atiende en ese horario ese día. Por favor elegí otro." },
+        { status: 400 }
+      );
     }
 
     const horaFin = horaFinDe(horaInicio);

@@ -154,6 +154,20 @@ export const ESTADO_META: Record<
 
 /* ----------------------------- date helpers ----------------------------- */
 
+/**
+ * "YYYY-MM-DD" de hoy en hora argentina, sin importar la zona del servidor.
+ *
+ * En Vercel el servidor corre en UTC, así que entre las 21:00 y la medianoche
+ * de acá ya está en el día siguiente. Sin esto, el formulario ofrece una fecha
+ * que la API rechaza por la regla de 24 hs.
+ */
+export function hoyEnArgentina(): string {
+  // "en-CA" formatea como YYYY-MM-DD, que es justo la clave que usamos.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
+}
+
 /** Devuelve YYYY-MM-DD en horario local (no UTC). */
 export function toDateKey(d: Date): string {
   const y = d.getFullYear();

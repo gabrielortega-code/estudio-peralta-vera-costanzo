@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_CALENDAR, type CalendarConfigData } from "@/lib/calendar";
 import { ESTADOS_QUE_OCUPAN, HORARIOS, seSolapan } from "@/lib/turnos";
 
 /** Cliente de Prisma o el cliente de una transacción interactiva. */
@@ -68,6 +69,35 @@ export async function assertHorarioLibre(
   if (reservas.some((r) => seSolapan(horaInicio, r.horaInicio))) {
     throw new SlotOcupadoError();
   }
+}
+
+/**
+ * Configuración del calendario guardada en la base, o los defaults si la tabla
+ * todavía no existe (el proyecto usa `prisma db push`, así que en un entorno
+ * recién levantado puede faltar).
+ *
+ * Cualquier otro error de base se propaga a propósito: quien reserva tiene que
+ * fallar cerrado, no dejar pasar un día u horario que el estudio bloqueó.
+ */
+export async function leerCalendarConfig(
+  db: Db = prisma
+): Promise<CalendarConfigData> {
+  try {
+    const record = await (db as any).calendarConfig.findUnique({
+      where: { id: "main" },
+    });
+    return (record?.config as CalendarConfigData) ?? DEFAULT_CALENDAR;
+  } catch (error) {
+    if (esTablaInexistente(error)) return DEFAULT_CALENDAR;
+    throw error;
+  }
+}
+
+function esTablaInexistente(error: unknown): boolean {
+  // P2021 = "The table does not exist in the current database".
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021"
+  );
 }
 
 /** Valida que el horario sea uno de los slots que ofrece el estudio. */

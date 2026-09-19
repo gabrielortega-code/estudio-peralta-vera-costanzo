@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { HORARIOS, slotsOcupados } from "@/lib/turnos";
-import { reservasDelDia } from "@/lib/disponibilidad";
+import { getModalidadForDate, horariosHabilitados } from "@/lib/calendar";
+import { slotsOcupados } from "@/lib/turnos";
+import { leerCalendarConfig, reservasDelDia } from "@/lib/disponibilidad";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Horarios ya tomados para una fecha. Público: devuelve únicamente horas,
- * nunca datos de los clientes que reservaron.
+ * Horarios de una fecha. Público: devuelve únicamente horas, nunca datos de los
+ * clientes que reservaron.
+ *
+ * Distingue dos motivos por los que una hora no se puede elegir:
+ *  - `ocupados`: ya hay un turno que se solapa (el formulario dice "reservado").
+ *  - fuera de `habilitados`: el estudio no atiende a esa hora ese día, según la
+ *    configuración del panel. Esas horas directamente no se ofrecen.
  */
 export async function GET(req: NextRequest) {
   const fecha = req.nextUrl.searchParams.get("fecha") ?? "";
@@ -20,12 +26,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const config = await leerCalendarConfig();
+    const diaBloqueado = getModalidadForDate(config, fecha) === "bloqueado";
+    const habilitados = diaBloqueado ? [] : horariosHabilitados(config, fecha);
+
     const reservas = await reservasDelDia(prisma, fecha);
     const ocupados = slotsOcupados(reservas);
+
     return NextResponse.json({
       fecha,
-      ocupados,
-      disponibles: HORARIOS.filter((h) => !ocupados.includes(h)),
+      habilitados,
+      ocupados: ocupados.filter((h) => habilitados.includes(h)),
+      disponibles: habilitados.filter((h) => !ocupados.includes(h)),
     });
   } catch (error) {
     console.error("Error consultando disponibilidad:", error);

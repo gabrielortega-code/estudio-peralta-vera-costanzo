@@ -12,9 +12,17 @@ import {
   WEEKDAY_ABBR,
   CALENDAR_HEADER,
   MONTH_NAMES,
+  horariosHabilitados,
   monthCells,
 } from "@/lib/calendar";
-import { toDateKey } from "@/lib/turnos";
+import {
+  type Turno,
+  ESTADOS_QUE_OCUPAN,
+  HORARIOS,
+  horaToMin,
+  toDateKey,
+  turnoDateKey,
+} from "@/lib/turnos";
 
 /* ─── visual tokens ─────────────────────────────────────────── */
 
@@ -27,6 +35,25 @@ const TOK: Record<
   virtual:    { bg: "bg-blue-50",    ring: "ring-blue-300",    text: "text-blue-800",    dot: "bg-blue-500",    chip: "bg-blue-100 text-blue-800"    },
   bloqueado:  { bg: "bg-rose-50",    ring: "ring-rose-200",    text: "text-rose-700",    dot: "bg-rose-400",    chip: "bg-rose-100 text-rose-700"    },
 };
+
+/* ─── horarios ──────────────────────────────────────────────── */
+
+// El corte del mediodía: los slots arrancan de nuevo a las 14:00.
+const SLOTS_MANANA = HORARIOS.filter((h) => horaToMin(h) < 13 * 60);
+const SLOTS_TARDE = HORARIOS.filter((h) => horaToMin(h) >= 13 * 60);
+
+function mismoConjunto(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((h) => b.includes(h));
+}
+
+/** Texto corto para no tener que abrir la fila y ver los 15 horarios. */
+function resumenHoras(horas: string[]): string {
+  if (horas.length === 0) return "Sin horarios";
+  if (mismoConjunto(horas, HORARIOS)) return "Todos los horarios";
+  if (mismoConjunto(horas, SLOTS_MANANA)) return "Solo por la mañana";
+  if (mismoConjunto(horas, SLOTS_TARDE)) return "Solo por la tarde";
+  return `${horas.length} de ${HORARIOS.length} horarios`;
+}
 
 /* ─── calendar helpers ──────────────────────────────────────── */
 
@@ -53,6 +80,71 @@ function dayLongLabel(dk: string): string {
   });
 }
 
+/* ─── grilla de horarios ────────────────────────────────────── */
+
+const ATAJOS: [string, string[]][] = [
+  ["Todo el día", HORARIOS],
+  ["Solo mañana", SLOTS_MANANA],
+  ["Solo tarde", SLOTS_TARDE],
+  ["Ninguno", []],
+];
+
+/** Los 15 horarios como chips que se prenden y apagan, más los atajos. */
+function GrillaHoras({
+  horas,
+  onToggle,
+  onAtajo,
+  deshabilitada,
+}: {
+  horas: string[];
+  onToggle: (hora: string) => void;
+  onAtajo: (horas: string[]) => void;
+  deshabilitada?: boolean;
+}) {
+  return (
+    <div className={deshabilitada ? "opacity-40 pointer-events-none" : ""}>
+      <div className="flex flex-wrap gap-1.5 mb-2.5">
+        {ATAJOS.map(([label, set]) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onAtajo([...set])}
+            className={[
+              "px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors",
+              mismoConjunto(horas, set)
+                ? "bg-navy-900 border-navy-900 text-white"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
+            ].join(" ")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-5 sm:grid-cols-8 gap-1.5">
+        {HORARIOS.map(h => {
+          const activo = horas.includes(h);
+          return (
+            <button
+              key={h}
+              type="button"
+              aria-pressed={activo}
+              onClick={() => onToggle(h)}
+              className={[
+                "py-1.5 rounded-lg text-[11px] font-semibold border transition-colors",
+                activo
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                  : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 line-through decoration-slate-300",
+              ].join(" ")}
+            >
+              {h}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ─── component ─────────────────────────────────────────────── */
 
 interface Props {
@@ -60,6 +152,8 @@ interface Props {
   onSave: (config: CalendarConfigData) => void;
   onClose: () => void;
   saving?: boolean;
+  /** Turnos ya cargados, para avisar si un cambio deja alguno fuera de horario. */
+  turnos?: Turno[];
 }
 
 export default function CalendarConfigPanel({
@@ -67,6 +161,7 @@ export default function CalendarConfigPanel({
   onSave,
   onClose,
   saving,
+  turnos = [],
 }: Props) {
   const todayKey = toDateKey(new Date());
   const now = new Date();
@@ -79,7 +174,12 @@ export default function CalendarConfigPanel({
     },
     dayOverrides: { ...initialConfig.dayOverrides },
     blockedRanges: [...initialConfig.blockedRanges],
+    weekdayHours: { ...initialConfig.weekdayHours },
+    dayHours: { ...initialConfig.dayHours },
   });
+
+  /* fila de horarios abierta en "Horarios de atención" */
+  const [wdAbierto, setWdAbierto] = useState<string | null>(null);
 
   /* calendar nav */
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -123,6 +223,52 @@ export default function CalendarConfigPanel({
     }));
   }
 
+  /** Horarios habilitados hoy para un día de la semana (sin configurar = todos). */
+  function horasDeWeekday(wd: string): string[] {
+    return draft.weekdayHours?.[wd] ?? HORARIOS;
+  }
+
+  function setWeekdayHours(wd: string, horas: string[]) {
+    setDraft(prev => ({
+      ...prev,
+      weekdayHours: { ...prev.weekdayHours, [wd]: horas },
+    }));
+  }
+
+  function toggleHoraWeekday(wd: string, hora: string) {
+    const actuales = horasDeWeekday(wd);
+    setWeekdayHours(
+      wd,
+      actuales.includes(hora)
+        ? actuales.filter(h => h !== hora)
+        : HORARIOS.filter(h => h === hora || actuales.includes(h))
+    );
+  }
+
+  /** Horarios de una fecha puntual, o null si hereda los del día de la semana. */
+  function horasDeDia(dk: string): string[] | null {
+    return draft.dayHours?.[dk] ?? null;
+  }
+
+  function setDayHours(dk: string, horas: string[] | null) {
+    setDraft(prev => {
+      const dh = { ...prev.dayHours };
+      if (horas === null) delete dh[dk];
+      else dh[dk] = horas;
+      return { ...prev, dayHours: dh };
+    });
+  }
+
+  function toggleHoraDia(dk: string, hora: string) {
+    const actuales = horasDeDia(dk) ?? horasDeWeekday(weekdayOf(dk));
+    setDayHours(
+      dk,
+      actuales.includes(hora)
+        ? actuales.filter(h => h !== hora)
+        : HORARIOS.filter(h => h === hora || actuales.includes(h))
+    );
+  }
+
   function handleAddRange() {
     if (!newFrom || !newTo || newFrom > newTo) return;
     const id = `br_${Date.now()}`;
@@ -146,6 +292,25 @@ export default function CalendarConfigPanel({
     }));
   }
 
+  /**
+   * Turnos futuros que el borrador dejaría fuera de la agenda: o porque se
+   * bloqueó el día, o porque se apagó su horario. No se cancelan solos — esto
+   * es un aviso para que Javier los reprograme o hable con el cliente.
+   */
+  const conflictos = useMemo(() => {
+    return turnos
+      .filter(
+        t =>
+          ESTADOS_QUE_OCUPAN.includes(t.estado) && turnoDateKey(t) >= todayKey
+      )
+      .filter(t => {
+        const dk = turnoDateKey(t);
+        if (getModalidadForDate(draft, dk) === "bloqueado") return true;
+        return !horariosHabilitados(draft, dk).includes(t.horaInicio);
+      })
+      .sort((a, b) => turnoDateKey(a).localeCompare(turnoDateKey(b)));
+  }, [turnos, draft, todayKey]);
+
   /* derived for selected day */
   const selWd        = selected ? weekdayOf(selected) : null;
   const selOverride  = selected ? (draft.dayOverrides[selected] ?? null) : null;
@@ -163,7 +328,8 @@ export default function CalendarConfigPanel({
               Configuración del calendario
             </h2>
             <p className="text-slate-500 text-sm mt-0.5">
-              Habilitá modalidades por día y bloqueá períodos sin disponibilidad.
+              Definí modalidades y horarios por día, y bloqueá períodos sin
+              disponibilidad.
             </p>
           </div>
           <button
@@ -350,6 +516,38 @@ export default function CalendarConfigPanel({
                   );
                 })}
               </div>
+
+              {/* Horarios de este día puntual */}
+              {getModalidadForDate(draft, selected) !== "bloqueado" && (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="flex items-start justify-between mb-2.5">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-700">
+                        Horarios de este día
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {horasDeDia(selected)
+                          ? "Excepción solo para esta fecha."
+                          : <>Hereda los horarios del {WEEKDAY_NAMES[selWd].toLowerCase()}. Tocá un horario para crear una excepción.</>}
+                      </p>
+                    </div>
+                    {horasDeDia(selected) && (
+                      <button
+                        type="button"
+                        onClick={() => setDayHours(selected, null)}
+                        className="text-[11px] text-rose-500 hover:text-rose-700 font-semibold ml-3 flex-shrink-0"
+                      >
+                        Volver a los del {WEEKDAY_ABBR[Number(selWd)].toLowerCase()}
+                      </button>
+                    )}
+                  </div>
+                  <GrillaHoras
+                    horas={horasDeDia(selected) ?? horasDeWeekday(selWd)}
+                    onToggle={h => toggleHoraDia(selected, h)}
+                    onAtajo={hs => setDayHours(selected, hs)}
+                  />
+                </div>
+              )}
             </section>
           )}
 
@@ -380,6 +578,74 @@ export default function CalendarConfigPanel({
                       <option value="virtual">Virtual</option>
                       <option value="bloqueado">Sin turnos</option>
                     </select>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ── Horarios de atención ── */}
+          <section>
+            <h3 className="text-sm font-semibold text-navy-900 mb-0.5">
+              Horarios de atención
+            </h3>
+            <p className="text-xs text-slate-500 mb-3">
+              En qué horas se puede reservar cada día. Las consultas duran 1 hora,
+              así que un turno a las 10:00 también ocupa las 09:30 y las 10:30.
+            </p>
+            <div className="space-y-1.5">
+              {["1", "2", "3", "4", "5", "6", "0"].map(wd => {
+                const bloqueado =
+                  (draft.weekdayDefaults[wd] ?? "ambas") === "bloqueado";
+                const horas = horasDeWeekday(wd);
+                const abierto = wdAbierto === wd;
+                return (
+                  <div
+                    key={wd}
+                    className="border border-slate-200 rounded-xl overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setWdAbierto(abierto ? null : wd)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <span className="text-sm font-semibold text-navy-900 w-20 sm:w-24 flex-shrink-0">
+                        {WEEKDAY_NAMES[wd]}
+                      </span>
+                      <span
+                        className={`text-xs flex-1 ${
+                          bloqueado ? "text-rose-600" : "text-slate-500"
+                        }`}
+                      >
+                        {bloqueado ? "Sin turnos ese día" : resumenHoras(horas)}
+                      </span>
+                      <svg
+                        className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${
+                          abierto ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {abierto && (
+                      <div className="px-3.5 pb-3.5 pt-3 border-t border-slate-100">
+                        {bloqueado && (
+                          <p className="text-[11px] text-rose-600 mb-2.5">
+                            Este día está marcado como “Sin turnos” más arriba, así
+                            que no se reserva a ninguna hora.
+                          </p>
+                        )}
+                        <GrillaHoras
+                          horas={horas}
+                          deshabilitada={bloqueado}
+                          onToggle={h => toggleHoraWeekday(wd, h)}
+                          onAtajo={hs => setWeekdayHours(wd, hs)}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -500,7 +766,34 @@ export default function CalendarConfigPanel({
         </div>
 
         {/* Footer */}
-        <div className="px-5 sm:px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-4">
+        <div className="px-5 sm:px-6 py-4 border-t border-slate-100">
+          {conflictos.length > 0 && (
+            <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-amber-900">
+                {conflictos.length === 1
+                  ? "Hay 1 turno agendado fuera de esta configuración"
+                  : `Hay ${conflictos.length} turnos agendados fuera de esta configuración`}
+              </p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                No se cancelan al guardar. Revisalos y reprogramalos o avisale al
+                cliente.
+              </p>
+              <ul className="mt-2 space-y-0.5">
+                {conflictos.slice(0, 5).map(t => (
+                  <li key={t.id} className="text-[11px] text-amber-800">
+                    · {dateLabel(turnoDateKey(t))} a las {t.horaInicio} hs —{" "}
+                    {t.nombre}
+                  </li>
+                ))}
+                {conflictos.length > 5 && (
+                  <li className="text-[11px] text-amber-700">
+                    · y {conflictos.length - 5} más
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4">
           <p className="text-xs text-slate-400 hidden sm:block">
             Los cambios se aplican al formulario de turnos de inmediato.
           </p>
@@ -520,6 +813,7 @@ export default function CalendarConfigPanel({
             >
               {saving ? "Guardando…" : "Guardar cambios"}
             </button>
+          </div>
           </div>
         </div>
       </div>

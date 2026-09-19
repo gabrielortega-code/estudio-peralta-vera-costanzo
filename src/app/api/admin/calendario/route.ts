@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_CALENDAR, type CalendarConfigData } from "@/lib/calendar";
+import { leerCalendarConfig } from "@/lib/disponibilidad";
 import { checkAdminAuth } from "@/lib/adminAuth";
 
 export async function GET(req: NextRequest) {
-  if (!checkAdminAuth(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   try {
-    const record = await (prisma as any).calendarConfig.findUnique({
-      where: { id: "main" },
-    });
-    return NextResponse.json(record?.config ?? DEFAULT_CALENDAR);
-  } catch {
+    return NextResponse.json(await leerCalendarConfig());
+  } catch (error) {
+    console.error("Error leyendo la configuración del calendario:", error);
     return NextResponse.json(DEFAULT_CALENDAR);
   }
 }
 
 export async function PUT(req: NextRequest) {
-  if (!checkAdminAuth(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   const config: CalendarConfigData = await req.json();

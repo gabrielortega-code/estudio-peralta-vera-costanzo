@@ -189,3 +189,41 @@ export async function sendNotificacionAdmin(turno: TurnoData): Promise<void> {
     htmlContent: html,
   });
 }
+
+/**
+ * Código de acceso al panel. Sale por el SMTP propio del hosting y **nunca** por
+ * Brevo: el destinatario es una casilla `@estudiojuridicoperalta.com` y ese
+ * servidor rechaza los correos de Brevo con "550 Blacklisted". Si no hay SMTP
+ * configurado, esto lanza — sin canal de entrega no hay segundo factor, y dejar
+ * pasar el login sería peor que no poder entrar.
+ */
+export async function sendCodigoAcceso(
+  destinatario: string,
+  codigo: string,
+  minutos: number
+): Promise<void> {
+  if (!getSmtpTransport()) {
+    throw new Error("SMTP no está configurado: no se puede enviar el código de acceso");
+  }
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1a1a1a;">
+      <h2 style="color: #1a3a5c;">Código de acceso al panel</h2>
+      <p>Tu código para entrar al panel de turnos es:</p>
+      <p style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0d1a3d; margin: 24px 0;">
+        ${codigo}
+      </p>
+      <p>Vence en ${minutos} minutos y se puede usar una sola vez.</p>
+      <p style="color: #777; font-size: 13px; margin-top: 24px;">
+        Si no fuiste vos quien intentó entrar, alguien conoce la contraseña del
+        panel: cambiala apenas puedas.
+      </p>
+    </div>
+  `;
+
+  await sendSmtpEmail({
+    to: destinatario,
+    subject: `Código de acceso al panel: ${codigo}`,
+    htmlContent: html,
+  });
+}

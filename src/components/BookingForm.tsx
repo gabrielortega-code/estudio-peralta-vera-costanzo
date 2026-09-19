@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  HORARIOS,
   CANALES_VIRTUAL,
   TEL_JAVIER,
   toDateKey,
@@ -46,8 +45,11 @@ export default function BookingForm() {
 
   const modalidadDia: ModalidadDia = getModalidadForDate(calConfig, fecha);
 
-  // Horarios ya tomados para la fecha elegida
+  // Horarios de la fecha elegida. `habilitados` son las horas en que el estudio
+  // atiende ese día según el panel; `ocupados`, las que ya tienen turno. La API
+  // es la fuente de las dos: acá no se arma la grilla a mano.
   const [horario, setHorario] = useState("");
+  const [habilitados, setHabilitados] = useState<string[]>([]);
   const [ocupados, setOcupados] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
   // Se incrementa para forzar una recarga de la disponibilidad
@@ -60,18 +62,26 @@ export default function BookingForm() {
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (cancelado) return;
+        const abiertos: string[] = Array.isArray(d?.habilitados) ? d.habilitados : [];
         const tomados: string[] = Array.isArray(d?.ocupados) ? d.ocupados : [];
+        setHabilitados(abiertos);
         setOcupados(tomados);
-        // Si el horario elegido se ocupó mientras tanto, lo soltamos
-        setHorario(h => (h && tomados.includes(h) ? "" : h));
+        // Si el horario elegido se ocupó o se deshabilitó mientras tanto, lo soltamos
+        setHorario(h =>
+          h && (tomados.includes(h) || !abiertos.includes(h)) ? "" : h
+        );
       })
-      .catch(() => { if (!cancelado) setOcupados([]); })
+      .catch(() => {
+        if (cancelado) return;
+        setHabilitados([]);
+        setOcupados([]);
+      })
       .finally(() => { if (!cancelado) setLoadingSlots(false); });
     return () => { cancelado = true; };
   }, [fecha, slotsNonce]);
 
   const sinHorarios =
-    !loadingSlots && HORARIOS.every(h => ocupados.includes(h));
+    !loadingSlots && habilitados.every(h => ocupados.includes(h));
 
   // Sincroniza modalidad cuando el día solo permite una opción
   useEffect(() => {
@@ -391,7 +401,7 @@ export default function BookingForm() {
                   ? "Sin horarios disponibles"
                   : "Seleccioná un horario…"}
               </option>
-              {HORARIOS.map((h) => {
+              {habilitados.map((h) => {
                 const tomado = ocupados.includes(h);
                 return (
                   <option key={h} value={h} disabled={tomado}>

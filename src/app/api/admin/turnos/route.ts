@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { checkAdminAuth } from "@/lib/adminAuth";
+import {
+  ADMIN_COOKIE,
+  COOKIE_OPTIONS,
+  checkAdminAuth,
+  revisarSesion,
+} from "@/lib/adminAuth";
 import { ESTADOS_QUE_OCUPAN, horaFinDe, type EstadoTurno } from "@/lib/turnos";
 import {
   assertHorarioLibre,
@@ -10,7 +15,11 @@ import {
 } from "@/lib/disponibilidad";
 
 export async function GET(req: NextRequest) {
-  if (!checkAdminAuth(req)) {
+  // El panel llama a esta ruta al abrirse y cada 60 s, así que es el lugar
+  // natural para estirar la sesión: mientras Javier lo use, no vuelve a ver la
+  // pantalla de login.
+  const sesion = await revisarSesion(req);
+  if (!sesion.autorizada) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -22,11 +31,18 @@ export async function GET(req: NextRequest) {
     orderBy: { fecha: "asc" },
   });
 
-  return NextResponse.json(turnos);
+  const res = NextResponse.json(turnos);
+  if (sesion.renovacion) {
+    res.cookies.set(ADMIN_COOKIE, sesion.renovacion.value, {
+      ...COOKIE_OPTIONS,
+      maxAge: sesion.renovacion.maxAge,
+    });
+  }
+  return res;
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!checkAdminAuth(req)) {
+  if (!(await checkAdminAuth(req))) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

@@ -32,6 +32,8 @@ model Turno {
   notaAdmin   String?
   enlace      String?  // link de la videollamada (turnos virtuales)
 
+  // Toda consulta de disponibilidad filtra por el día.
+  @@index([fecha])
   @@map("turnos")
 }
 
@@ -48,4 +50,34 @@ model CalendarConfig {
   updatedAt DateTime @updatedAt
 
   @@map("calendar_config")
+}
+
+/// Único administrador del panel (Javier). La contraseña se guarda hasheada con
+/// scrypt; ADMIN_SECRET dejó de ser la clave y solo firma las sesiones.
+model AdminUser {
+  id           String   @id @default("main")
+  email        String
+  passwordHash String
+  /// Se incrementa al cambiar la contraseña: invalida todas las sesiones
+  /// abiertas sin necesidad de una tabla de sesiones.
+  tokenVersion Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admin_user")
+}
+
+/// Códigos de un solo uso que se mandan por email como segundo factor del login.
+model AdminLoginCode {
+  id        String    @id @default(cuid())
+  /// sha256 del código de 6 dígitos: no se guarda en claro.
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  /// Para limpiar los vencidos y contar cuántos se emitieron en la última hora.
+  @@index([createdAt])
+  @@map("admin_login_codes")
 }

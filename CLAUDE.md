@@ -223,6 +223,93 @@ Si alguna vez se lleva la raíz a Vercel: desacoplar primero `autodiscover` y
 registro AAAA de la raíz**, o todos los visitantes con IPv6 siguen viendo el sitio
 viejo.
 
+### El panel de admin: contraseña propia y código por email
+
+Desde la reunión de septiembre de 2026, Javier tiene **su propia contraseña** y
+la puede cambiar solo, desde "Seguridad" en el panel. El login tiene dos pasos:
+la contraseña, y después un **código de 6 dígitos** que llega a su correo (vence
+a los 10 minutos, un solo uso, 5 intentos, máximo 3 códigos por hora).
+
+- La contraseña se guarda **hasheada con scrypt** en la tabla `admin_user`
+  (`src/lib/adminAuth.ts`). El formato `scrypt$N$r$p$salt$hash` lleva los
+  parámetros adentro, así que se pueden cambiar sin invalidar los hashes viejos.
+- El código del segundo factor sale por el **SMTP propio del hosting**, nunca por
+  Brevo, por lo mismo que el aviso de turnos (ver más arriba).
+- El alta inicial y la recuperación se hacen con `npm run admin:password`, un
+  script de línea de comandos. No hay registro público, a propósito.
+- Cambiar la contraseña incrementa `tokenVersion` y con eso **cierra todas las
+  sesiones abiertas** y da de baja los dispositivos de confianza: las dos cookies
+  llevan la versión adentro de la firma.
+
+**La sesión dura 30 días y se renueva sola.** Cuando le queda menos de la mitad,
+`GET /api/admin/turnos` —que el panel consulta al abrirse y cada 60 segundos—
+devuelve una cookie nueva. Usando el panel con cierta regularidad, Javier no
+vuelve a ver la pantalla de login.
+
+**Dispositivo de confianza.** En la pantalla del código hay una casilla, *apagada
+por defecto*, para no volver a pedirlo en esa computadora. Marca una cookie
+`admin_device` de 90 días; con ella presente, el paso 1 abre la sesión con solo
+la contraseña. No debilita el segundo factor: el código protege contra quien
+averigua la contraseña **sin** tener el navegador de Javier, y una cookie
+`httpOnly` en su máquina no le sirve a esa persona. Salir del panel **no** borra
+la marca, a propósito.
+
+La contraparte de una sesión larga es **"Cerrar sesión en todos los
+dispositivos"** (`DELETE /api/admin/sesiones`, botón en Seguridad): incrementa
+`tokenVersion` sin tocar la contraseña, así que corta todo de una si se pierde un
+equipo. La pestaña desde la que se aprieta recibe una sesión nueva.
+
+Las cookies de sesión y de dispositivo se firman con propósitos distintos
+(`sesion:` y `dispositivo:` adentro del HMAC), así que una no puede presentarse
+como la otra.
+
+⚠️ **`ADMIN_SECRET` ya no es la contraseña del panel.** Quedó con dos usos, los
+dos de quien administra el sitio, no del cliente:
+
+1. Firma las cookies de sesión. Rotarla cierra todas las sesiones.
+2. Habilita el acceso de emergencia por header `x-admin-secret`, **sin** el
+   código por correo, para poder entrar si el correo de Javier deja de
+   funcionar.
+
+Por eso tiene que ser un valor aleatorio largo y **no** hay que compartirla con
+el cliente.
+
+### Turnos: la exclusión de horarios vive en la aplicación
+
+Cada consulta dura una hora (`DURACION_MIN` en `src/lib/turnos.ts`) pero la
+grilla ofrece slots cada 30 minutos, así que reservar las 10:00 también bloquea
+las 09:30 y las 10:30. La regla la comparten el formulario, el panel y la API.
+
+**No hay constraint de unicidad en la base**: un `@@unique(fecha, horaInicio)`
+impediría volver a reservar un horario cuyo turno fue cancelado, y tampoco
+cubriría el solapamiento de ±30 minutos. La exclusión mutua la garantiza
+`src/lib/disponibilidad.ts`, con `pg_advisory_xact_lock` por fecha y un
+re-chequeo dentro de la misma transacción. Funciona mientras **toda** escritura
+pase por las rutas de la API: una carga a mano desde Prisma Studio o por SQL
+directo puede duplicar un horario.
+
+Las fechas se comparan en hora argentina con `hoyEnArgentina()`, no con la del
+servidor: en Vercel el servidor está en UTC y después de las 21:00 de acá ya
+pasó al día siguiente.
+
+### Horarios configurables por día
+
+`CalendarConfig` (tabla `calendar_config`, un `Json`) ya manejaba la modalidad
+por día; desde septiembre de 2026 maneja además **qué horas se atienden**, con
+`weekdayHours` (por día de la semana) y `dayHours` (excepción de una fecha
+puntual). Se guardan los horarios **habilitados**, no los bloqueados: una
+configuración vieja sin esos campos significa "se atiende en todos los
+horarios", así que no hubo que migrar nada. El helper es `horariosHabilitados()`
+en `src/lib/calendar.ts`.
+
+Javier lo configura desde "Calendario" en el panel. Si un cambio deja turnos ya
+agendados fuera de horario, el panel los lista antes de guardar — pero **no los
+cancela**: eso lo decide él.
+
+La configuración limita lo que el público puede reservar solo. En la
+reprogramación desde el panel, los horarios fuera de agenda aparecen marcados
+pero se pueden elegir igual.
+
 ### Remitente de Brevo
 
 `EMAIL_FROM` es `turnos@mail.estudiojuridicoperalta.com`. Ese **subdominio** está

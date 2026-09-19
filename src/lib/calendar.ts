@@ -1,3 +1,5 @@
+import { HORARIOS } from "@/lib/turnos";
+
 export type ModalidadDia = "ambas" | "presencial" | "virtual" | "bloqueado";
 
 export interface BlockedRange {
@@ -11,6 +13,15 @@ export interface CalendarConfigData {
   weekdayDefaults: Partial<Record<string, ModalidadDia>>; // "0"=Dom … "6"=Sáb
   dayOverrides: Record<string, ModalidadDia>;              // "YYYY-MM-DD"
   blockedRanges: BlockedRange[];
+  /**
+   * Horarios habilitados por día de la semana ("0"=Dom … "6"=Sáb). Se guardan
+   * los habilitados y no los bloqueados: así una configuración vieja que no
+   * tiene el campo sigue significando "se atiende en todos los horarios", y no
+   * hace falta migrar nada.
+   */
+  weekdayHours?: Partial<Record<string, string[]>>;
+  /** Excepción de horarios para una fecha puntual "YYYY-MM-DD". */
+  dayHours?: Record<string, string[]>;
 }
 
 export const DEFAULT_CALENDAR: CalendarConfigData = {
@@ -43,6 +54,41 @@ export function getModalidadForDate(
   const [y, m, d] = dateKey.split("-").map(Number);
   const wd = String(new Date(y, m - 1, d).getDay());
   return config.weekdayDefaults[wd] ?? "ambas";
+}
+
+/**
+ * Horarios en los que el estudio atiende una fecha dada, en el orden de
+ * `HORARIOS`. Misma precedencia que `getModalidadForDate`: la excepción de la
+ * fecha puntual gana sobre el default del día de la semana, y si no hay nada
+ * configurado se atiende en todos.
+ *
+ * Los rangos bloqueados y los días sin turnos se resuelven con
+ * `getModalidadForDate`; acá solo importa la franja horaria.
+ */
+export function horariosHabilitados(
+  config: CalendarConfigData | null | undefined,
+  dateKey: string
+): string[] {
+  if (!config) return HORARIOS;
+
+  const puntual = config.dayHours?.[dateKey];
+  if (puntual) return filtrarConocidos(puntual);
+
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const wd = String(new Date(y, m - 1, d).getDay());
+  const semanal = config.weekdayHours?.[wd];
+  if (semanal) return filtrarConocidos(semanal);
+
+  return HORARIOS;
+}
+
+/**
+ * Deja solo los horarios que el estudio ofrece hoy, en el orden canónico. Una
+ * config guardada antes de cambiar `HORARIOS` puede tener horas que ya no
+ * existen; ignorarlas evita ofrecer un horario fantasma.
+ */
+function filtrarConocidos(horas: string[]): string[] {
+  return HORARIOS.filter((h) => horas.includes(h));
 }
 
 export const MODALIDAD_LABEL: Record<ModalidadDia, string> = {

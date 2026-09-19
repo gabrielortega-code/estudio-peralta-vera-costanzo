@@ -32,8 +32,10 @@ import {
   DEFAULT_CALENDAR,
   CALENDAR_HEADER,
   MONTH_NAMES,
+  horariosHabilitados,
   monthCells,
 } from "@/lib/calendar";
+import { PASSWORD_MIN } from "@/lib/passwordPolicy";
 import CalendarConfigPanel from "./CalendarConfigPanel";
 
 /* ------------------------------- helpers -------------------------------- */
@@ -60,12 +62,28 @@ const ESTADO_FILTERS: { value: "TODOS" | EstadoTurno; label: string }[] = [
   { value: "COMPLETADO", label: "Completados" },
 ];
 
-export default function AdminPanel() {
+export default function AdminPanel({
+  /** El servidor ya miró la cookie: si no hay sesión, vamos directo al login. */
+  sesionActiva = false,
+}: {
+  sesionActiva?: boolean;
+}) {
   const [authenticated, setAuthenticated] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [secret, setSecret] = useState("");
+  const [checkingSession, setCheckingSession] = useState(sesionActiva);
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
+
+  // Login en dos pasos: primero la contraseña, después el código que llega por
+  // correo. `desafio` guarda a qué código estamos respondiendo.
+  const [password, setPassword] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [desafio, setDesafio] = useState<{
+    challengeId: string;
+    email: string;
+    vigenciaMin: number;
+  } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [recordarDispositivo, setRecordarDispositivo] = useState(false);
 
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [view, setView] = useState<"dia" | "mes">("dia");
@@ -78,6 +96,7 @@ export default function AdminPanel() {
   const [toast, setToast] = useState<string | null>(null);
   const [settings, setSettings] = useState<LinkSettings>({ zoom: "", meet: "" });
   const [showSettings, setShowSettings] = useState(false);
+  const [showSeguridad, setShowSeguridad] = useState(false);
   const [calendarConfig, setCalendarConfig] = useState<CalendarConfigData>(DEFAULT_CALENDAR);
   const [showCalendar, setShowCalendar] = useState(false);
   const [savingCalendar, setSavingCalendar] = useState(false);
@@ -86,8 +105,9 @@ export default function AdminPanel() {
     setSettings(loadLinkSettings());
   }, []);
 
-  // Si hay una sesión activa (cookie), entra directo sin pedir la clave.
+  // Con sesión vigente entramos directo, sin pedir contraseña ni código.
   useEffect(() => {
+    if (!sesionActiva) return;
     fetch("/api/admin/turnos")
       .then(async (res) => {
         if (!res.ok) return;
@@ -97,7 +117,8 @@ export default function AdminPanel() {
       })
       .catch(() => {})
       .finally(() => setCheckingSession(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesionActiva]);
 
   // Refresco automático: nuevas reservas aparecen sin recargar la página
   // (cada 60 s y al volver a la pestaña).
@@ -164,29 +185,81 @@ export default function AdminPanel() {
     }
   }
 
+  /** Carga los datos y entra al panel una vez que la sesión quedó abierta. */
+  async function entrarAlPanel() {
+    const res = await fetch("/api/admin/turnos");
+    if (!res.ok) throw new Error("Sesión iniciada pero la API no respondió");
+    setTurnos(await res.json());
+    setPassword("");
+    setCodigo("");
+    setDesafio(null);
+    setRecordarDispositivo(false);
+    setAuthenticated(true);
+    loadCalendarConfig();
+  }
+
+  /** Paso 1: la contraseña. No abre sesión, dispara el código por correo. */
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoggingIn(true);
     setLoginError("");
     try {
-      const login = await fetch("/api/admin/login", {
+      const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret }),
+        body: JSON.stringify({ password }),
       });
-      if (login.status === 429) {
-        setLoginError("Demasiados intentos. Esperá un minuto y volvé a probar.");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoginError(json.error ?? "No se pudo iniciar sesión.");
         return;
       }
-      if (!login.ok) throw new Error();
-      const res = await fetch("/api/admin/turnos");
-      if (!res.ok) throw new Error();
-      setTurnos(await res.json());
-      setSecret("");
-      setAuthenticated(true);
-      loadCalendarConfig();
+      // En una computadora marcada como de confianza no hace falta el código.
+      if (json.step === "listo") {
+        await entrarAlPanel();
+        return;
+      }
+      setDesafio({
+        challengeId: json.challengeId,
+        email: json.email,
+        vigenciaMin: json.vigenciaMin,
+      });
     } catch {
-      setLoginError("Clave incorrecta o sin conexión a la base de datos.");
+      setLoginError("Sin conexión con el servidor. Probá de nuevo.");
+    } finally {
+      setLoggingIn(false);
+    }
+  }
+
+  /** Paso 2: el código de un solo uso. Recién acá se abre la sesión. */
+  async function handleVerificar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!desafio) return;
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const res = await fetch("/api/admin/login/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challengeId: desafio.challengeId,
+          codigo,
+          recordar: recordarDispositivo,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoginError(json.error ?? "No se pudo verificar el código.");
+        // Código quemado: hay que volver a empezar por la contraseña.
+        if (res.status === 400) {
+          setDesafio(null);
+          setCodigo("");
+        }
+        return;
+      }
+      await entrarAlPanel();
+    } catch {
+      setLoginError("Sin conexión con el servidor. Probá de nuevo.");
     } finally {
       setLoggingIn(false);
     }
@@ -237,6 +310,11 @@ export default function AdminPanel() {
           ESTADOS_QUE_OCUPAN.includes(t.estado)
       )
     );
+  }
+
+  /** Horarios en los que el estudio atiende ese día, según la configuración. */
+  function habilitadosDe(dk: string): string[] {
+    return horariosHabilitados(calendarConfig, dk);
   }
 
   /* ------------------------------ derived ------------------------------ */
@@ -319,34 +397,108 @@ export default function AdminPanel() {
             <p className="text-gray-400 text-sm">Peralta &amp; Vera Costanzo</p>
           </div>
 
-          <form
-            onSubmit={handleLogin}
-            className="bg-white rounded-xl shadow-xl p-6 space-y-4"
-          >
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Clave de acceso
-              </label>
-              <input
-                type="password"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
-                placeholder="Ingrese la clave…"
-                autoFocus
-              />
-            </div>
-            {loginError && (
-              <p className="text-rose-600 text-xs">{loginError}</p>
-            )}
-            <button
-              type="submit"
-              disabled={loggingIn}
-              className="w-full bg-navy-900 hover:bg-navy-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors"
+          {desafio ? (
+            <form
+              onSubmit={handleVerificar}
+              className="bg-white rounded-xl shadow-xl p-6 space-y-4"
             >
-              {loggingIn ? "Verificando…" : "Ingresar al panel"}
-            </button>
-          </form>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código de acceso
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Te mandamos un código de 6 dígitos a {desafio.email}. Vence en{" "}
+                  {desafio.vigenciaMin} minutos.
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={codigo}
+                  onChange={(e) =>
+                    setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-center text-lg font-semibold tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-navy-500"
+                  placeholder="······"
+                  autoFocus
+                />
+              </div>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={recordarDispositivo}
+                  onChange={(e) => setRecordarDispositivo(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-navy-900 focus:ring-navy-500"
+                />
+                <span className="text-xs text-gray-600 leading-snug">
+                  No volver a pedirme el código en esta computadora
+                  <span className="block text-gray-400">
+                    Marcala solo en tus equipos, no en uno prestado.
+                  </span>
+                </span>
+              </label>
+              {loginError && <p className="text-rose-600 text-xs">{loginError}</p>}
+              <button
+                type="submit"
+                disabled={loggingIn || codigo.length !== 6}
+                className="w-full bg-navy-900 hover:bg-navy-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors"
+              >
+                {loggingIn ? "Verificando…" : "Entrar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDesafio(null);
+                  setCodigo("");
+                  setLoginError("");
+                }}
+                className="w-full text-gray-500 hover:text-gray-700 text-xs"
+              >
+                Volver e ingresar la contraseña de nuevo
+              </button>
+            </form>
+          ) : (
+            <form
+              onSubmit={handleLogin}
+              className="bg-white rounded-xl shadow-xl p-6 space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    className="w-full border border-gray-300 rounded-lg pl-3 pr-16 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    placeholder="Ingresá tu contraseña…"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    {showPassword ? "Ocultar" : "Ver"}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Después te vamos a pedir un código que llega a tu correo.
+                </p>
+              </div>
+              {loginError && <p className="text-rose-600 text-xs">{loginError}</p>}
+              <button
+                type="submit"
+                disabled={loggingIn || !password}
+                className="w-full bg-navy-900 hover:bg-navy-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors"
+              >
+                {loggingIn ? "Verificando…" : "Continuar"}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     );
@@ -388,6 +540,16 @@ export default function AdminPanel() {
               <span className="hidden sm:inline">Calendario</span>
             </button>
             <button
+              onClick={() => setShowSeguridad(true)}
+              title="Cambiar contraseña"
+              className="flex items-center gap-1.5 text-gray-300 hover:text-white text-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span className="hidden sm:inline">Seguridad</span>
+            </button>
+            <button
               onClick={() => setShowSettings(true)}
               title="Configuración de enlaces"
               className="flex items-center gap-1.5 text-gray-300 hover:text-white text-sm transition-colors"
@@ -403,7 +565,9 @@ export default function AdminPanel() {
                 fetch("/api/admin/login", { method: "DELETE" }).catch(() => {});
                 setAuthenticated(false);
                 setTurnos([]);
-                setSecret("");
+                setPassword("");
+                setCodigo("");
+                setDesafio(null);
               }}
               className="text-gray-300 hover:text-white text-sm transition-colors"
             >
@@ -666,6 +830,7 @@ export default function AdminPanel() {
             mutate(selected.id, { notaAdmin }, "Nota guardada")
           }
           ocupadosDe={ocupadosDe}
+          habilitadosDe={habilitadosDe}
         />
       )}
 
@@ -682,9 +847,20 @@ export default function AdminPanel() {
         />
       )}
 
+      {showSeguridad && (
+        <SeguridadModal
+          onClose={() => setShowSeguridad(false)}
+          onDone={(msg) => {
+            setShowSeguridad(false);
+            notify(msg);
+          }}
+        />
+      )}
+
       {showCalendar && (
         <CalendarConfigPanel
           initialConfig={calendarConfig}
+          turnos={turnos}
           onSave={handleSaveCalendar}
           onClose={() => setShowCalendar(false)}
           saving={savingCalendar}
@@ -1055,6 +1231,7 @@ function TurnoDrawer({
   onReschedule,
   onSaveNota,
   ocupadosDe,
+  habilitadosDe,
 }: {
   turno: Turno;
   settings: LinkSettings;
@@ -1064,6 +1241,7 @@ function TurnoDrawer({
   onReschedule: (fecha: string, horaInicio: string, horaFin: string) => void;
   onSaveNota: (nota: string) => void;
   ocupadosDe: (dateKey: string, excluirId?: string) => string[];
+  habilitadosDe: (dateKey: string) => string[];
 }) {
   const [tab, setTab] = useState<"acciones" | "reprogramar">("acciones");
   const [nota, setNota] = useState(turno.notaAdmin ?? "");
@@ -1077,6 +1255,9 @@ function TurnoDrawer({
   // Horarios que ya están tomados el día al que se quiere mover el turno
   const ocupados = ocupadosDe(newDate, turno.id);
   const horaOcupada = ocupados.includes(newHora);
+  // Fuera del horario de atención configurado. No se bloquea: la configuración
+  // limita lo que el público puede reservar solo, no lo que Javier acuerda a mano.
+  const habilitados = habilitadosDe(newDate);
 
   const esVirtual = turno.modalidad === "Virtual";
   const esWhatsapp = turno.canal === "WhatsApp (videollamada)";
@@ -1392,9 +1573,15 @@ function TurnoDrawer({
                     >
                       {HORARIOS.map((h) => {
                         const tomado = ocupados.includes(h);
+                        const fueraDeHorario = !habilitados.includes(h);
+                        const nota = tomado
+                          ? " — ocupado"
+                          : fueraDeHorario
+                          ? " — fuera de horario"
+                          : "";
                         return (
                           <option key={h} value={h} disabled={tomado}>
-                            {h} hs{tomado ? " — ocupado" : ""}
+                            {h} hs{nota}
                           </option>
                         );
                       })}
@@ -1514,6 +1701,217 @@ function ActionBtn({
     >
       {children}
     </button>
+  );
+}
+
+/** Cambio de la contraseña del panel. Pide la actual aunque ya haya sesión. */
+function SeguridadModal({
+  onClose,
+  onDone,
+}: {
+  onClose: () => void;
+  onDone: (mensaje: string) => void;
+}) {
+  const [actual, setActual] = useState("");
+  const [nueva, setNueva] = useState("");
+  const [repetir, setRepetir] = useState("");
+  const [ver, setVer] = useState(false);
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [confirmarCierre, setConfirmarCierre] = useState(false);
+  const [cerrando, setCerrando] = useState(false);
+
+  async function cerrarTodo() {
+    setCerrando(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/sesiones", { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "No se pudieron cerrar las sesiones.");
+        return;
+      }
+      onDone(json.mensaje ?? "Sesiones cerradas");
+    } catch {
+      setError("Sin conexión con el servidor. Probá de nuevo.");
+    } finally {
+      setCerrando(false);
+    }
+  }
+
+  const cortaDemas = nueva.length > 0 && nueva.length < PASSWORD_MIN;
+  const noCoinciden = repetir.length > 0 && nueva !== repetir;
+  const puedeGuardar =
+    Boolean(actual) && nueva.length >= PASSWORD_MIN && nueva === repetir && !guardando;
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    setGuardando(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actual, nueva }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "No se pudo cambiar la contraseña.");
+        return;
+      }
+      onDone(json.mensaje ?? "Contraseña actualizada");
+    } catch {
+      setError("Sin conexión con el servidor. Probá de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-navy-950/40" onClick={onClose} aria-hidden />
+      <form
+        onSubmit={guardar}
+        className="relative bg-white rounded-xl shadow-2xl w-full max-w-md"
+      >
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="font-serif font-bold text-navy-900 text-lg">
+            Cambiar contraseña
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700"
+            aria-label="Cerrar"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-5 py-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Contraseña actual
+            </label>
+            <input
+              type="password"
+              value={actual}
+              onChange={(e) => setActual(e.target.value)}
+              autoComplete="current-password"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Contraseña nueva
+            </label>
+            <div className="relative">
+              <input
+                type={ver ? "text" : "password"}
+                value={nueva}
+                onChange={(e) => setNueva(e.target.value)}
+                autoComplete="new-password"
+                className="w-full border border-slate-300 rounded-lg pl-3 pr-16 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+              />
+              <button
+                type="button"
+                onClick={() => setVer((v) => !v)}
+                className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-slate-500 hover:text-slate-700"
+              >
+                {ver ? "Ocultar" : "Ver"}
+              </button>
+            </div>
+            <p
+              className={`text-xs mt-1 ${cortaDemas ? "text-rose-600" : "text-slate-400"}`}
+            >
+              Al menos {PASSWORD_MIN} caracteres. Cuanto más larga, mejor.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Repetir la nueva
+            </label>
+            <input
+              type={ver ? "text" : "password"}
+              value={repetir}
+              onChange={(e) => setRepetir(e.target.value)}
+              autoComplete="new-password"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+            />
+            {noCoinciden && (
+              <p className="text-xs text-rose-600 mt-1">Las contraseñas no coinciden.</p>
+            )}
+          </div>
+
+          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+            Al guardar se cierran las sesiones abiertas en otros dispositivos.
+            Esta pestaña sigue conectada.
+          </p>
+
+          {error && <p className="text-rose-600 text-xs">{error}</p>}
+
+          <div className="pt-4 border-t border-slate-200">
+            <p className="text-sm font-medium text-slate-700">
+              Cerrar sesión en todos los dispositivos
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5 mb-2.5">
+              Si perdiste una computadora o el teléfono, esto cierra todas las
+              sesiones abiertas y deja de confiar en los equipos marcados. No
+              cambia tu contraseña.
+            </p>
+            {confirmarCierre ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={cerrarTodo}
+                  disabled={cerrando}
+                  className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white"
+                >
+                  {cerrando ? "Cerrando…" : "Sí, cerrar todo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmarCierre(false)}
+                  className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmarCierre(true)}
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold border border-rose-200 text-rose-700 hover:bg-rose-50"
+              >
+                Cerrar todas las sesiones
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={!puedeGuardar}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-navy-900 hover:bg-navy-800 disabled:opacity-50 text-white"
+          >
+            {guardando ? "Guardando…" : "Cambiar contraseña"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
